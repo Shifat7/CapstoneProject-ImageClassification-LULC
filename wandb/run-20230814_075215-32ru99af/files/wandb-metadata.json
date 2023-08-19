@@ -1,0 +1,65 @@
+{
+    "os": "Linux-5.4.0-150-generic-x86_64-with-glibc2.17",
+    "python": "3.8.16",
+    "heartbeatAt": "2023-08-13T21:52:16.271226",
+    "startedAt": "2023-08-13T21:52:15.362963",
+    "docker": null,
+    "cuda": null,
+    "args": [
+        "--model=DoubleSwinTransformerSegmentation",
+        "--image_px_size=224",
+        "--checkpoint=checkpoints/swin_t.pth",
+        "--target",
+        "dfc",
+        "--epochs=2",
+        "--dataloader_workers=4"
+    ],
+    "state": "running",
+    "program": "train_evaluation.py",
+    "codePath": "train_evaluation.py",
+    "git": {
+        "remote": "https://github.com/HSG-AIML/SSLTransformerRS",
+        "commit": "23ffb689e124f74342ebcec50ad946a582d0f64a"
+    },
+    "email": null,
+    "root": "/home/harry/swin/SSLTransformerRS",
+    "host": "u18",
+    "username": "harry",
+    "executable": "/home/harry/miniconda3/envs/TEST/bin/python",
+    "cpu_count": 4,
+    "cpu_count_logical": 4,
+    "cpu_freq": {
+        "current": 3792.884,
+        "min": 0.0,
+        "max": 0.0
+    },
+    "cpu_freq_per_core": [
+        {
+            "current": 3792.884,
+            "min": 0.0,
+            "max": 0.0
+        },
+        {
+            "current": 3792.884,
+            "min": 0.0,
+            "max": 0.0
+        },
+        {
+            "current": 3792.884,
+            "min": 0.0,
+            "max": 0.0
+        },
+        {
+            "current": 3792.884,
+            "min": 0.0,
+            "max": 0.0
+        }
+    ],
+    "disk": {
+        "total": 87.81240844726562,
+        "used": 75.21573638916016
+    },
+    "memory": {
+        "total": 19.085227966308594
+    }
+}

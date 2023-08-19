@@ -1,0 +1,35 @@
+CONFIG: {'seed': 42, 'epochs': 2, 'learning_rate': 1e-05, 'classifier_lr': 3e-06, 'batch_size': 100, 'adam_betas': [0.9, 0.999], 'weight_decay': 0.001, 'learning_rate_schedule': {'100': 0.1}, 'train_dir': 'splits', 'train_mode': 'validation', 'create_validation_set': 'False', 'val_dir': 'splits', 'val_mode': 'test', 'clip_sample_values': 1, 'transforms': None, 'num_classes': 8, 'only_rgb': 0, 'rgb_plus_s1': 0, 'dataloader_workers': 4, 's1_input_channels': 2, 's2_input_channels': 13, 'train_used_data_fraction': 1, 'image_px_size': 224, 'cover_all_parts_validation': 1, 'cover_all_parts_train': 0, 'balanced_classes_train': 1, 'balanced_classes_validation': 0, 's1_normalization_fixed': 1, 'simclr_dataset': 0, 'out_dim': 128, 'model': 'DoubleSwinTransformerSegmentation', 'base_model': 'resnet18', 'target': 'dfc', 'finetuning': 0, 'checkpoint': 'checkpoints/swin_t.pth', 'embedding_size': 256, 'wandb_project': None}
+model_name swin-t
+/home/harry/miniconda3/envs/TEST/lib/python3.8/site-packages/torch/functional.py:504: UserWarning: torch.meshgrid: in an upcoming release, it will be required to pass the indexing argument. (Triggered internally at /croot/pytorch_1681837265408/work/aten/src/ATen/native/TensorShape.cpp:3190.)
+  return _VF.meshgrid(tensors, **kwargs)  # type: ignore[attr-defined]
+Frozen backbone
+
+  0%|                                                    | 0/27 [01:29<?, ?it/s]
+Traceback (most recent call last):
+  File "train_evaluation.py", line 553, in <module>
+    y_hat = model(img)
+  File "/home/harry/miniconda3/envs/TEST/lib/python3.8/site-packages/torch/nn/modules/module.py", line 1194, in _call_impl
+    return forward_call(*input, **kwargs)
+  File "/home/harry/swin/SSLTransformerRS/Transformer_SSL/models/swin_transformer.py", line 1085, in forward
+    _, x1, x_seg1 = self.backbone1.forward_features(x["s1"].to(self.device))
+  File "/home/harry/swin/SSLTransformerRS/Transformer_SSL/models/swin_transformer.py", line 854, in forward_features
+    x = layer(x)
+  File "/home/harry/miniconda3/envs/TEST/lib/python3.8/site-packages/torch/nn/modules/module.py", line 1194, in _call_impl
+    return forward_call(*input, **kwargs)
+  File "/home/harry/swin/SSLTransformerRS/Transformer_SSL/models/swin_transformer.py", line 633, in forward
+    x = blk(x)
+  File "/home/harry/miniconda3/envs/TEST/lib/python3.8/site-packages/torch/nn/modules/module.py", line 1194, in _call_impl
+    return forward_call(*input, **kwargs)
+  File "/home/harry/swin/SSLTransformerRS/Transformer_SSL/models/swin_transformer.py", line 365, in forward
+    x = x + self.drop_path(self.mlp(self.norm2(x)))
+  File "/home/harry/miniconda3/envs/TEST/lib/python3.8/site-packages/torch/nn/modules/module.py", line 1194, in _call_impl
+    return forward_call(*input, **kwargs)
+  File "/home/harry/swin/SSLTransformerRS/Transformer_SSL/models/swin_transformer.py", line 36, in forward
+    x = self.drop(x)
+  File "/home/harry/miniconda3/envs/TEST/lib/python3.8/site-packages/torch/nn/modules/module.py", line 1194, in _call_impl
+    return forward_call(*input, **kwargs)
+  File "/home/harry/miniconda3/envs/TEST/lib/python3.8/site-packages/torch/nn/modules/dropout.py", line 59, in forward
+    return F.dropout(input, self.p, self.training, self.inplace)
+  File "/home/harry/miniconda3/envs/TEST/lib/python3.8/site-packages/torch/nn/functional.py", line 1252, in dropout
+    return _VF.dropout_(input, p, training) if inplace else _VF.dropout(input, p, training)
+KeyboardInterrupt

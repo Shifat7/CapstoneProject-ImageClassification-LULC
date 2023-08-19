@@ -1,0 +1,22 @@
+CONFIG: {'seed': 42, 'epochs': 201, 'learning_rate': 1e-05, 'classifier_lr': 3e-06, 'batch_size': 8, 'adam_betas': [0.9, 0.999], 'weight_decay': 0.001, 'learning_rate_schedule': {'100': 0.1}, 'train_dir': '/netscratch/lscheibenreif/grss-dfc-20', 'train_mode': 'validation', 'create_validation_set': 'False', 'val_dir': '/netscratch/lscheibenreif/grss-dfc-20', 'val_mode': 'test', 'clip_sample_values': 1, 'transforms': None, 'num_classes': 8, 'only_rgb': 0, 'rgb_plus_s1': 0, 'dataloader_workers': 8, 's1_input_channels': 2, 's2_input_channels': 13, 'train_used_data_fraction': 1, 'image_px_size': 224, 'cover_all_parts_validation': 1, 'cover_all_parts_train': 0, 'balanced_classes_train': 1, 'balanced_classes_validation': 0, 's1_normalization_fixed': 1, 'simclr_dataset': 0, 'out_dim': 128, 'model': 'DoubleSwinTransformerSegmentation', 'base_model': 'resnet18', 'target': 'dfc', 'finetuning': 0, 'checkpoint': 'checkpoints/swin_t.pth', 'embedding_size': 256, 'wandb_project': None}
+model_name swin-t
+/home/harry/miniconda3/envs/TEST/lib/python3.8/site-packages/torch/functional.py:504: UserWarning: torch.meshgrid: in an upcoming release, it will be required to pass the indexing argument. (Triggered internally at /croot/pytorch_1681837265408/work/aten/src/ATen/native/TensorShape.cpp:3190.)
+  return _VF.meshgrid(tensors, **kwargs)  # type: ignore[attr-defined]
+Traceback (most recent call last):
+  File "train_evaluation.py", line 315, in <module>
+    checkpoint = torch.load(
+  File "/home/harry/miniconda3/envs/TEST/lib/python3.8/site-packages/torch/serialization.py", line 789, in load
+    return _load(opened_zipfile, map_location, pickle_module, **pickle_load_args)
+  File "/home/harry/miniconda3/envs/TEST/lib/python3.8/site-packages/torch/serialization.py", line 1131, in _load
+    result = unpickler.load()
+  File "/home/harry/miniconda3/envs/TEST/lib/python3.8/site-packages/torch/serialization.py", line 1101, in persistent_load
+    load_tensor(dtype, nbytes, key, _maybe_decode_ascii(location))
+  File "/home/harry/miniconda3/envs/TEST/lib/python3.8/site-packages/torch/serialization.py", line 1083, in load_tensor
+    wrap_storage=restore_location(storage, location),
+  File "/home/harry/miniconda3/envs/TEST/lib/python3.8/site-packages/torch/serialization.py", line 215, in default_restore_location
+    result = fn(storage, location)
+  File "/home/harry/miniconda3/envs/TEST/lib/python3.8/site-packages/torch/serialization.py", line 182, in _cuda_deserialize
+    device = validate_cuda_device(location)
+  File "/home/harry/miniconda3/envs/TEST/lib/python3.8/site-packages/torch/serialization.py", line 166, in validate_cuda_device
+    raise RuntimeError('Attempting to deserialize object on a CUDA '
+RuntimeError: Attempting to deserialize object on a CUDA device but torch.cuda.is_available() is False. If you are running on a CPU-only machine, please use torch.load with map_location=torch.device('cpu') to map your storages to the CPU.
