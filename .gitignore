@@ -2,3 +2,4 @@ checkpoints/*
 splits/*
 wandb/*
 splits
+checkpoints
