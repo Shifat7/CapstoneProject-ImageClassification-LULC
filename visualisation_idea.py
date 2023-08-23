@@ -1,5 +1,5 @@
 # Credit to SSLTransformerRS GitHub repo
-
+import csv # for CSV write
 import argparse
 import json
 import os
@@ -14,6 +14,7 @@ from tqdm import tqdm
 from torchvision.models import resnet18, resnet50
 
 from dfc_dataset import DFCDataset
+
 
 from Transformer_SSL.models.swin_transformer import * # refine to classes required
 from utils import save_checkpoint_single_model, dotdictify
@@ -102,6 +103,32 @@ print(str(output_arrays[count - 1].size(dim=0)) + " pixels in y axis")
     # write coordinate info? and classification category (integer) to CSV file
     # close CSV write
 
+
+# Create the "output" folder if it doesn't exist
+output_folder = "output"
+os.makedirs(output_folder, exist_ok=True)
+
+# Get the filename of the current TIF patch
+tif_filename = f"ROIs0000_{data_config['val_mode']}_dfc_0_p{currentPatch}.tif"
+
+# Remove the file extension to use as data_info
+data_info = os.path.splitext(tif_filename)[0]
+
+# Generate the dynamic CSV filename
+csv_filename = os.path.join(output_folder, f"output_data_{data_info}.csv")
+
+# Create a CSV file inside the "output" folder for writing
+with open(csv_filename, mode='w', newline='') as csv_file:
+    csv_writer = csv.writer(csv_file)
+    
+    # Loop through the rows of output_arrays
+    for row in output_arrays:
+        # Convert tensor elements to Python scalars and write each element to the CSV file
+        row_elements = [i.item() for i in row]
+        csv_writer.writerow(row_elements)
+        
+# Print a message indicating the CSV file was created
+print(f"CSV file '{csv_filename}' created.")
 
 # 13/08/2023 - need to train a new segmentation model, change path and load it
 # copy VM to new drive, likely faster
