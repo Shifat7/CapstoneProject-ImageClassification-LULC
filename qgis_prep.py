@@ -17,7 +17,7 @@ for csv_file in os.listdir(input_folder):
         csv_path = os.path.join(input_folder, csv_file)
         with open(csv_path, "r") as f:
             csv_data = list(csv.reader(f))
-        output_data = np.array(csv_data, dtype=np.int32)  # Convert to appropriate data type
+        output_data = np.array(csv_data, dtype=np.int32)  # Convert to appropriate(I think?) data type
 
         # Print debug information
         print("CSV file:", csv_file)
