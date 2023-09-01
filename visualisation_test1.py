@@ -53,5 +53,4 @@ val_dataset.visualize_observation(20)
 
 #val_dataset.cheeky(20)
 
-val_dataset.testSqueeze(20)
-
+#val_dataset.testSqueeze(20)

@@ -1,5 +1,5 @@
 # Credit to SSLTransformerRS GitHub repo
-import csv # for CSV write
+import csv
 import argparse
 import json
 import os
@@ -13,8 +13,12 @@ from distutils.util import strtobool
 from tqdm import tqdm
 from torchvision.models import resnet18, resnet50
 
-from dfc_dataset import DFCDataset
+# New set for visualisation test
+import matplotlib.pyplot as plt
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+from dfc_sen12ms_dataset import DFCSEN12MSDataset, Seasons, S1Bands, S2Bands, LCBands
 
+from dfc_dataset_sandbox import DFCDataset # use sandbox version
 
 from Transformer_SSL.models.swin_transformer import * # refine to classes required
 from utils import save_checkpoint_single_model, dotdictify
@@ -69,7 +73,7 @@ model = DoubleSwinTransformerSegmentation(s1_backbone, s2_backbone, out_dim=data
 # EVENTUALLY iterate through all patches here (include all subsequent code in loop starting here)
 
 # select a single patch from MPC data
-currentPatch = 30 #iterator
+currentPatch = 45 #iterator
 
 # load desired segmentation checkpoint
 model.load_state_dict(torch.load("checkpoints/swin-t-pixel-classification-volcanic-aardvark-27-epoch-2.pth", map_location='cpu')) # replace path with desired checkpoint
@@ -96,7 +100,11 @@ for i in output_arrays:
     print(i)
     count += 1
 print(str(count) + " pixels in x axis.")
-print(str(output_arrays[count - 1].size(dim=0)) + " pixels in y axis") 
+print(str(output_arrays[count - 1].size(dim=0)) + " pixels in y axis")
+
+# VISUALISATION CODE
+val_dataset.test_visual(currentPatch, output_arrays)
+
 
 # for each pixel in image patch,
     # open CSV write
