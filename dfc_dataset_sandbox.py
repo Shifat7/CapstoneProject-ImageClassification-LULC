@@ -474,7 +474,7 @@ class DFCDataset(Dataset):
 
         print(model_output.squeeze().numpy())
 
-        dfc_plot = model_output.reshape([224, 224]).numpy() #CURRENTLY TESTING
+        dfc_plot = model_output.reshape([224, 224]).numpy()
         #dfc_plot[dfc_plot == 255] = np.nan
 
         mat = axs[1].matshow(dfc_plot, cmap=cmap, vmin=0 - 0.5, vmax=7 + 0.5) # create the plot

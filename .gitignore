@@ -3,3 +3,5 @@ splits/*
 wandb/*
 splits
 checkpoints
+wandb
+Patch_Cropper/patches/*

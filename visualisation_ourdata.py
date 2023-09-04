@@ -18,6 +18,10 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from dfc_sen12ms_dataset import DFCSEN12MSDataset, Seasons, S1Bands, S2Bands, LCBands
 
+# New from Erik code for read patch from file
+import rasterio
+from enum import Enum
+
 from dfc_dataset_sandbox import DFCDataset # use sandbox version
 
 from Transformer_SSL.models.swin_transformer import * # refine to classes required
@@ -66,7 +70,7 @@ val_dataset = DFCDataset(
 # SAMPLE CODE FOR SEGMENTATION OUTPUT
 
 # create a new model's instance
-model = DoubleSwinTransformerSegmentation(s1_backbone, s2_backbone, out_dim=data_config['num_classes'], device=device)
+model = DoubleSwinTransformerSegmentationS2(s2_backbone, out_dim=data_config['num_classes'], device=device)
 
 #model = model.to(device)
 
@@ -76,31 +80,91 @@ model = DoubleSwinTransformerSegmentation(s1_backbone, s2_backbone, out_dim=data
 currentPatch = 45 #iterator
 
 # load desired segmentation checkpoint
-model.load_state_dict(torch.load("checkpoints/swin-t-pixel-classification-balmy-universe-47-epoch-200.pth", map_location='cpu')) # replace path with desired checkpoint
+model.load_state_dict(torch.load("checkpoints/swin-t-pixel-classification-charmed-puddle-99-epoch-4.pth", map_location='cpu')) # replace path with desired checkpoint
 model.to(device)
 
 # prepare input
-img = {"s1": torch.unsqueeze(val_dataset[currentPatch]['s1'], 0), "s2": torch.unsqueeze(val_dataset[currentPatch]['s2'], 0)} # adding an extra dimension for batch information
+#img = {"s1": torch.unsqueeze(val_dataset[currentPatch]['s1'], 0), "s2": torch.unsqueeze(val_dataset[currentPatch]['s2'], 0)}
+img = {"s2": torch.unsqueeze(val_dataset[currentPatch]['s2'], 0)}
 # may look different to the above based on the form of the MPC data
+#print(torch.unsqueeze(val_dataset[currentPatch]['s2'], 0).shape) # [1, 13, 224, 224]
+
+patch_file = 'Patch_Cropper/patches/patch_0_5376.tif'
+#with rasterio.open(patch_file) as src:
+#    patch_data = src.read()
+
+class S2Bands(Enum):
+    B01 = aerosol = 1
+    B02 = blue = 2
+    B03 = green = 3
+    B04 = red = 4
+    B05 = re1 = 5
+    B06 = re2 = 6
+    B07 = re3 = 7
+    B08 = nir1 = 8
+    B08A = nir2 = 9
+    B09 = vapor = 10
+    B10 = cirrus = 11
+    B11 = swir1 = 12
+    B12 = swir2 = 13
+    ALL = [B01, B02, B03, B04, B05, B06, B07, B08, B08A, B09, B10, B11, B12]
+    RGB = [B04, B03, B02]
+    NONE = None
+
+bands = S2Bands.RGB.value
+# adapted from dfc_sen12ms_dataset
+with rasterio.open(patch_file) as patch:
+    patch_data = patch.read()
+    bounds = patch.bounds
+
+# patch_data format is [[224[224], 224[224], 224[224]]]
+
+#mpc_tensor = torch.zeros(1, 13, 224, 224)
+
+#mpc_tensor[0, 0, 0, 0] = patch_data[0][0][0]
+#mpc_tensor[0, 0, 0, 1] = patch_data[0][0][1]
+
+#print(mpc_tensor[:, 1, 1, 1])
+
+#for i in patch_data[1]:
+#    print(i)
+
+# convert numpy array to required size with patch_data.resize() WORKING HERE
+mpc_tensor = torch.from_numpy(patch_data)
+
+print(mpc_tensor)
+
+#patch_data = patch_data[None, :, :, :]
+# need to add 'batch information' B as extra dimension at start of array
+# need to reconfigure array
+
+patch_img = {"s2": mpc_tensor} # create dictionary using same format
+#patch_img = {"s2": torch.from_numpy(patch_data)} # create dictionary using same format
+
+#print(img)
+#print(patch_data)
 
 # evaluate using model
 model.eval() # sets the model in evaluation mode
-output = model(img) # pass input to model, 'output' is instance of DoubleSwinTransformerSegmentation
+output = model(patch_img) # pass input to model, 'output' is instance of DoubleSwinTransformerSegmentation
+#output = model(img)
 
 #TEST CODE
-print(torch.argmax(output)) # get 'argmax' value (not sure what this is) for output
+#print(torch.argmax(output)) # get 'argmax' value (not sure what this is) for output
 
 test = torch.max(output, dim=1)
-print(test.indices)
+#print(test.indices)
 
 output_arrays = test.indices.squeeze()
 
+'''
+Test segmentation output
 count = 0
 for i in output_arrays:
     print(i)
     count += 1
 print(str(count) + " pixels in x axis.")
-print(str(output_arrays[count - 1].size(dim=0)) + " pixels in y axis")
+print(str(output_arrays[count - 1].size(dim=0)) + " pixels in y axis")'''
 
 # VISUALISATION CODE
 val_dataset.test_visual(currentPatch, output_arrays)
