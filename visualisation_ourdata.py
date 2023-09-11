@@ -89,7 +89,7 @@ img = {"s2": torch.unsqueeze(val_dataset[currentPatch]['s2'], 0)}
 # may look different to the above based on the form of the MPC data
 #print(torch.unsqueeze(val_dataset[currentPatch]['s2'], 0).shape) # [1, 13, 224, 224]
 
-patch_file = 'Patch_Cropper/patches/patch_0_5376.tif'
+patch_file = 'Patch_Cropper/patches_test/patch_0_0.tif'
 #with rasterio.open(patch_file) as src:
 #    patch_data = src.read()
 
@@ -130,9 +130,10 @@ with rasterio.open(patch_file) as patch:
 #    print(i)
 
 # convert numpy array to required size with patch_data.resize() WORKING HERE
-mpc_tensor = torch.from_numpy(patch_data)
+mpc_tensor = torch.from_numpy(patch_data.astype('float32'))
 
 print(mpc_tensor)
+print(mpc_tensor.shape)
 
 #patch_data = patch_data[None, :, :, :]
 # need to add 'batch information' B as extra dimension at start of array
