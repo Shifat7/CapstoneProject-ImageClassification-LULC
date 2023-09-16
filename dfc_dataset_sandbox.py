@@ -451,11 +451,48 @@ class DFCDataset(Dataset):
         print(str(count) + " pixels in x axis.")
         print(str(dfc_data[count - 1].size) + " pixels in y axis")
 
+    def test_visual_mpc(self, patch_img, model_output, transform=False): # test function: self = Class instance, idx = patch ID
+        #sample = self.__getitem__(idx, s2_bands=S2Bands.RGB, transform=transform) #get the patch object
+
+        s2 = patch_img[:, [2,3,4], :, :]
+        s2 = torch.squeeze(s2, 0)
+        print(s2.shape)
+        #dfc = sample.get("dfc") GET CLASSIFIED DFC DATA FROM SAMPLE
+
+        fig, axs = plt.subplots(1, 2, figsize=(25, 5)) # CHANGE SECOND PARAMETER TO ADJUST NUMBER OF ROWS OF SUBPLOTS
+        img = np.moveaxis(s2.numpy(), 0, -1)
+        img = img / img.max(axis=(0, 1))
+        axs[0].imshow(img)
+        axs[0].set_title("Sentinel-2 RGB")
+
+        divider2 = make_axes_locatable(axs[1])
+        cax2 = divider2.append_axes("right", size="5%", pad=0.05)
+        dfc_data = model_output # see if works? same arrays printed to screen
+        data_stat = dfc_data[dfc_data != 255] # if operation
+        data_stat = data_stat[np.isnan(data_stat) == False] # if operation
+        #mi, ma = int(np.min(data_stat)), int(np.max(data_stat))
+        cmap = plt.get_cmap("RdBu", 8) # choose a colour map
+
+        print(model_output.squeeze().numpy())
+
+        dfc_plot = model_output.reshape([224, 224]).numpy()
+        #dfc_plot[dfc_plot == 255] = np.nan
+
+        mat = axs[1].matshow(dfc_plot, cmap=cmap, vmin=0 - 0.5, vmax=7 + 0.5) # create the plot
+        cax2 = plt.colorbar(
+            mat, ticks=np.arange(8), cax=cax2, orientation="vertical"
+        )
+
+        axs[1].set_title("Inference Output")
+        axs[1].axis(False)
+
+        plt.show()
+
 
     def test_visual(self, idx, model_output, transform=False): # test function: self = Class instance, idx = patch ID
         sample = self.__getitem__(idx, s2_bands=S2Bands.RGB, transform=transform) #get the patch object
 
-        s2 = sample.get("s2")
+        s2 = sample.get("s2") # shape is [3, 224, 224]
         #dfc = sample.get("dfc") GET CLASSIFIED DFC DATA FROM SAMPLE
 
         fig, axs = plt.subplots(1, 2, figsize=(25, 5)) # CHANGE SECOND PARAMETER TO ADJUST NUMBER OF ROWS OF SUBPLOTS

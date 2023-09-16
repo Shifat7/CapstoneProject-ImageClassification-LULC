@@ -117,41 +117,20 @@ with rasterio.open(patch_file) as patch:
     patch_data = patch.read()
     bounds = patch.bounds
 
-# patch_data format is [[224[224], 224[224], 224[224]]]
-
-#mpc_tensor = torch.zeros(1, 13, 224, 224)
-
-#mpc_tensor[0, 0, 0, 0] = patch_data[0][0][0]
-#mpc_tensor[0, 0, 0, 1] = patch_data[0][0][1]
-
-#print(mpc_tensor[:, 1, 1, 1])
-
-#for i in patch_data[1]:
-#    print(i)
-
-# convert numpy array to required size with patch_data.resize() WORKING HERE
 mpc_tensor = torch.from_numpy(patch_data.astype('float32'))
+#mpc_tensor = mpc_tensor[None, :, :, :] has same function as the below
+mpc_tensor = torch.unsqueeze(mpc_tensor, 0)
 
 print(mpc_tensor)
-print(mpc_tensor.shape)
+print(mpc_tensor.shape) # output is now [1, 13, 224, 224] as desired
 
-#patch_data = patch_data[None, :, :, :]
-# need to add 'batch information' B as extra dimension at start of array
-# need to reconfigure array
-
-patch_img = {"s2": mpc_tensor} # create dictionary using same format
+patch_img = {"s2": mpc_tensor} # create dictionary using same format as DFC
 #patch_img = {"s2": torch.from_numpy(patch_data)} # create dictionary using same format
-
-#print(img)
-#print(patch_data)
 
 # evaluate using model
 model.eval() # sets the model in evaluation mode
 output = model(patch_img) # pass input to model, 'output' is instance of DoubleSwinTransformerSegmentation
 #output = model(img)
-
-#TEST CODE
-#print(torch.argmax(output)) # get 'argmax' value (not sure what this is) for output
 
 test = torch.max(output, dim=1)
 #print(test.indices)
@@ -168,13 +147,9 @@ print(str(count) + " pixels in x axis.")
 print(str(output_arrays[count - 1].size(dim=0)) + " pixels in y axis")'''
 
 # VISUALISATION CODE
-val_dataset.test_visual(currentPatch, output_arrays)
+val_dataset.test_visual_mpc(mpc_tensor, output_arrays)
 
 # for each pixel in image patch,
     # open CSV write
     # write coordinate info? and classification category (integer) to CSV file
     # close CSV write
-
-
-# 13/08/2023 - need to train a new segmentation model, change path and load it
-# copy VM to new drive, likely faster
