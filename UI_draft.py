@@ -33,7 +33,7 @@ class DesktopUI(QMainWindow):
         col1_layout = QVBoxLayout()
         col1_layout.setAlignment(Qt.AlignCenter)
 
-        # Using QComboBox as the dropdown and labeling it "Select Model"
+        
         self.model_dropdown = QComboBox()
         self.model_dropdown.setFocusPolicy(Qt.NoFocus)
         self.model_dropdown.setStyleSheet("background-color: transparent; color: white; font-size: 14px;")
@@ -68,7 +68,7 @@ class DesktopUI(QMainWindow):
         self.date_picker.setDate(QDate.currentDate())
         square1_layout.addWidget(self.date_picker, alignment=Qt.AlignCenter)
 
-        # QLabel to display the selected image
+        
         self.image_label = QLabel()
         self.image_label.setAlignment(Qt.AlignCenter)
         square1_layout.addWidget(self.image_label)
@@ -116,7 +116,7 @@ class DesktopUI(QMainWindow):
         col2_frame.setLayout(col2_layout)
         main_layout.addWidget(col2_frame)
 
-        # Maintain the 2:8 ratio for the columns
+       
         main_layout.setStretch(0, 2)
         main_layout.setStretch(1, 8)
 
