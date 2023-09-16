@@ -3,7 +3,9 @@ from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
                              QHBoxLayout, QPushButton, QComboBox, QFileDialog,
                              QFrame, QDateEdit, QCalendarWidget, QLabel)
 from PyQt5.QtGui import QPalette, QColor, QPainter, QBrush, QPixmap
-from PyQt5.QtCore import Qt, QDate
+from PyQt5.QtCore import Qt, QDate, pyqtSlot, QObject
+from PyQt5.QtWebEngineWidgets import QWebEngineView
+from PyQt5.QtWebChannel import QWebChannel
 
 class RoundedSquare(QFrame):
     def __init__(self, color, parent=None):
@@ -33,7 +35,6 @@ class DesktopUI(QMainWindow):
         col1_layout = QVBoxLayout()
         col1_layout.setAlignment(Qt.AlignCenter)
 
-        
         self.model_dropdown = QComboBox()
         self.model_dropdown.setFocusPolicy(Qt.NoFocus)
         self.model_dropdown.setStyleSheet("background-color: transparent; color: white; font-size: 14px;")
@@ -43,7 +44,7 @@ class DesktopUI(QMainWindow):
         
         file_btn = QPushButton("Select Patches")
         file_btn.setStyleSheet("background-color: transparent; color: white; font-size: 14px;")
-        file_btn.clicked.connect(self.open_file_dialog)
+        file_btn.clicked.connect(self.open_map_dialog)
         col1_layout.addWidget(file_btn, alignment=Qt.AlignCenter)
         
         col1_layout.setSpacing(20)
@@ -116,7 +117,6 @@ class DesktopUI(QMainWindow):
         col2_frame.setLayout(col2_layout)
         main_layout.addWidget(col2_frame)
 
-       
         main_layout.setStretch(0, 2)
         main_layout.setStretch(1, 8)
 
@@ -143,14 +143,88 @@ class DesktopUI(QMainWindow):
     def pause_segmentation(self):
         print("Segmentation paused!")
 
-    def open_file_dialog(self):
-        file_name, _ = QFileDialog.getOpenFileName(self, "Open File")
-        if file_name:
-            pixmap = QPixmap(file_name)
-            self.image_label.setPixmap(pixmap)
-            self.image_label.setScaledContents(True)
+    def open_map_dialog(self):
+        self.map_window = QMainWindow(self)
+        self.map_window.setWindowTitle("Select Location on Map")
+        self.map_window.setGeometry(100, 100, 800, 600)
+        
+        browser = QWebEngineView(self.map_window)
+        
+        channel = QWebChannel(browser.page())
+        browser.page().setWebChannel(channel)
 
-app = QApplication(sys.argv)
-window = DesktopUI()
-window.show()
-sys.exit(app.exec_())
+        self.map_handler = MapHandler()
+        channel.registerObject('mapHandler', self.map_handler)
+
+        # Load HTML with Leaflet and Leaflet.draw 
+        browser.setHtml("""
+            <html>
+                <head>
+                    <title>Interactive Map</title>
+                    <meta charset="utf-8" />
+                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+                    <link rel="stylesheet" href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css" />
+                    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+                    <script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
+                    <script src="qrc:///qtwebchannel/qwebchannel.js"></script>
+                </head>
+                <body>
+                    <div id="map" style="width: 800px; height: 600px;"></div>
+                    <script>
+                        var map = L.map('map').setView([-37.8136, 144.9631], 10);
+                        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+
+                        var drawnItems = new L.FeatureGroup();
+                        map.addLayer(drawnItems);
+
+                        var drawControl = new L.Control.Draw({
+                            draw: {
+                                polyline: false,
+                                polygon: false,
+                                circle: false,
+                                marker: false,
+                                circlemarker: false
+                            },
+                            edit: {
+                                featureGroup: drawnItems
+                            }
+                        });
+                        map.addControl(drawControl);
+
+                        map.on(L.Draw.Event.CREATED, function (e) {
+                            var type = e.layerType;
+                            var layer = e.layer;
+
+                            if (type === 'rectangle') {
+                                var coords = {
+                                    northEast: layer.getBounds().getNorthEast(),
+                                    southWest: layer.getBounds().getSouthWest()
+                                };
+
+                                new QWebChannel(qt.webChannelTransport, function(channel) {
+                                    var mapHandler = channel.objects.mapHandler;
+                                    mapHandler.receiveMapSelection(coords);
+                                });
+                            }
+
+                            drawnItems.addLayer(layer);
+                        });
+                    </script>
+                </body>
+            </html>
+        """)
+        
+        self.map_window.setCentralWidget(browser)
+        self.map_window.show()
+
+class MapHandler(QObject):
+    @pyqtSlot('QVariant')
+    def receiveMapSelection(self, coords):
+        print(f"Selected area NorthEast: {coords['northEast']}, SouthWest: {coords['southWest']}")
+
+if __name__ == "__main__":
+    app = QApplication(sys.argv)
+    window = DesktopUI()
+    window.show()
+    sys.exit(app.exec_())
