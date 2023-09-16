@@ -76,48 +76,32 @@ model = DoubleSwinTransformerSegmentationS2(s2_backbone, out_dim=data_config['nu
 
 # EVENTUALLY iterate through all patches here (include all subsequent code in loop starting here)
 
-# select a single patch from MPC data
-currentPatch = 45 #iterator
-
 # load desired segmentation checkpoint
 model.load_state_dict(torch.load("checkpoints/swin-t-pixel-classification-charmed-puddle-99-epoch-4.pth", map_location='cpu')) # replace path with desired checkpoint
 model.to(device)
 
 # prepare input
-#img = {"s1": torch.unsqueeze(val_dataset[currentPatch]['s1'], 0), "s2": torch.unsqueeze(val_dataset[currentPatch]['s2'], 0)}
-img = {"s2": torch.unsqueeze(val_dataset[currentPatch]['s2'], 0)}
-# may look different to the above based on the form of the MPC data
-#print(torch.unsqueeze(val_dataset[currentPatch]['s2'], 0).shape) # [1, 13, 224, 224]
 
-patch_file = 'Patch_Cropper/patches_test/patch_0_0.tif'
-#with rasterio.open(patch_file) as src:
-#    patch_data = src.read()
+# select a single patch from MPC data
+patch_file = 'Patch_Cropper/patches_test/patch_3360_7168.tif'
 
-class S2Bands(Enum):
-    B01 = aerosol = 1
-    B02 = blue = 2
-    B03 = green = 3
-    B04 = red = 4
-    B05 = re1 = 5
-    B06 = re2 = 6
-    B07 = re3 = 7
-    B08 = nir1 = 8
-    B08A = nir2 = 9
-    B09 = vapor = 10
-    B10 = cirrus = 11
-    B11 = swir1 = 12
-    B12 = swir2 = 13
-    ALL = [B01, B02, B03, B04, B05, B06, B07, B08, B08A, B09, B10, B11, B12]
-    RGB = [B04, B03, B02]
-    NONE = None
-
-bands = S2Bands.RGB.value
 # adapted from dfc_sen12ms_dataset
 with rasterio.open(patch_file) as patch:
     patch_data = patch.read()
     bounds = patch.bounds
 
 mpc_tensor = torch.from_numpy(patch_data.astype('float32'))
+
+# Code for normalisation of patch - credit dfc_dataset.py
+s2_maxs = []
+for b_idx in range(mpc_tensor.shape[0]):
+    s2_maxs.append(
+        torch.ones((mpc_tensor.shape[-2], mpc_tensor.shape[-1])) * mpc_tensor[b_idx].max().item() + 1e-5
+    )
+s2_maxs = torch.stack(s2_maxs)
+
+mpc_tensor = mpc_tensor / s2_maxs
+
 #mpc_tensor = mpc_tensor[None, :, :, :] has same function as the below
 mpc_tensor = torch.unsqueeze(mpc_tensor, 0)
 

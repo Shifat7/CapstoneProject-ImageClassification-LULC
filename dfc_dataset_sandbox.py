@@ -130,15 +130,6 @@ class DFCDataset(Dataset):
         self.normalize = normalize
         self.moby_transform = moby_transform
 
-        if simclr_dataset:
-            from data_aug.contrastive_learning_dataset import ContrastiveLearningDataset
-            from data_aug.view_generator import ContrastiveLearningViewGenerator
-
-            self.simclr_transform = ContrastiveLearningViewGenerator(
-                ContrastiveLearningDataset.get_simclr_pipeline_transform(image_px_size),
-                n_views=2,
-            )
-
         if mode == "dfc":
             self.seasons = [
                 Seasons.AUTUMN_DFC,
