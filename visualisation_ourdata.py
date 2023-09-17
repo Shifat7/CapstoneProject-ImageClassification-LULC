@@ -18,9 +18,7 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from dfc_sen12ms_dataset import DFCSEN12MSDataset, Seasons, S1Bands, S2Bands, LCBands
 
-# New from Erik code for read patch from file
 import rasterio
-from enum import Enum
 
 from dfc_dataset_sandbox import DFCDataset # use sandbox version
 
@@ -72,8 +70,6 @@ val_dataset = DFCDataset(
 # create a new model's instance
 model = DoubleSwinTransformerSegmentationS2(s2_backbone, out_dim=data_config['num_classes'], device=device)
 
-#model = model.to(device)
-
 # EVENTUALLY iterate through all patches here (include all subsequent code in loop starting here)
 
 # load desired segmentation checkpoint
@@ -109,7 +105,6 @@ print(mpc_tensor)
 print(mpc_tensor.shape) # output is now [1, 13, 224, 224] as desired
 
 patch_img = {"s2": mpc_tensor} # create dictionary using same format as DFC
-#patch_img = {"s2": torch.from_numpy(patch_data)} # create dictionary using same format
 
 # evaluate using model
 model.eval() # sets the model in evaluation mode
@@ -120,15 +115,6 @@ test = torch.max(output, dim=1)
 #print(test.indices)
 
 output_arrays = test.indices.squeeze()
-
-'''
-Test segmentation output
-count = 0
-for i in output_arrays:
-    print(i)
-    count += 1
-print(str(count) + " pixels in x axis.")
-print(str(output_arrays[count - 1].size(dim=0)) + " pixels in y axis")'''
 
 # VISUALISATION CODE
 val_dataset.test_visual_mpc(mpc_tensor, output_arrays)
