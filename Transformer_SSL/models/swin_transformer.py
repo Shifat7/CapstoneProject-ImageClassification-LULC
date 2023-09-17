@@ -1050,6 +1050,15 @@ class SwinTransformerDecoder(nn.Module):
         return x
 
     def up_x4(self, x):
+        '''countA = 0
+        countB = 0
+        for i in x:
+            countA += 1
+            for j in i[0]:
+                countB += 1
+                print("Count B is " + str(countB))
+                # FOR S1+S2 this is 1536, for S2 only this is 768
+        print("Count A is " + str(countA))'''
         H, W = self.patches_resolution
         B, L, C = x.shape
         assert L == H * W, "input features has wrong size"
@@ -1090,6 +1099,37 @@ class DoubleSwinTransformerSegmentation(nn.Module):
         x = torch.cat([x1, x2], dim=-1)
 
         output = self.decoder1.up_x4(x)
+
+        return output
+    
+class DoubleSwinTransformerSegmentationS2(nn.Module):
+    def __init__(self, encoder2, out_dim, device, freeze_layers=False): #removed encoder1
+        super(DoubleSwinTransformerSegmentationS2, self).__init__()
+
+        self.device = device
+
+        #self.backbone1 = encoder1
+        self.backbone2 = encoder2
+
+        #self.decoder1 = SwinTransformerDecoder(self.backbone1, out_dim, device)
+        self.decoder2 = SwinTransformerDecoder(self.backbone2, out_dim, device)
+
+        # freeze all backbone layers
+        if freeze_layers:
+            for name, param in self.named_parameters():
+                if name.startswith(('backbone')):
+                    param.requires_grad = False
+
+    def forward(self, x):
+        _, x2, x_seg2 = self.backbone2.forward_features(x["s2"].to(self.device))
+        #_, x1, x_seg1 = self.backbone1.forward_features(x["s1"].to(self.device))
+
+        #x1 = self.decoder1.forward_up_features(x1, x_seg1)
+        x2 = self.decoder2.forward_up_features(x2, x_seg2)
+
+        x = torch.cat([x2, x2], dim=-1)
+
+        output = self.decoder2.up_x4(x) # changed to x2
 
         return output
 

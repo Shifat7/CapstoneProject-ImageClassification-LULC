@@ -3,3 +3,10 @@ splits/*
 wandb/*
 splits
 checkpoints
+wandb
+Patch_Cropper/patches/*
+Patch_Cropper/patches_test/*
+Patch_Cropper/*.tif
+Data_Downloader/*.tif
+Data_Downloader/LargeStackedTifs
+Data_Downloader/DataFolder
