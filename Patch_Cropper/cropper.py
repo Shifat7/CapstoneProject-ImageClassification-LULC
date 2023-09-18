@@ -3,16 +3,18 @@ from rasterio.windows import Window
 import os
 
 # Create a folder to store the cropped patches
-output_folder = 'patches'
+output_folder = 'patches_test'
 os.makedirs(output_folder, exist_ok=True)
 
 # Open Vuthy's large GeoTIFF file
-input_file = 'T55HBU_20220219T002049_TCI_10m.tif'
+input_file = 'S2A_MSIL2A_20221118T001111_R073_T55HCV_20221118T115719_combined.tif'
 with rasterio.open(input_file) as src:
     # Get the geotransform (affine transformation matrix(?))
     transform = src.transform
     # Get the CRS information
     crs = src.crs
+
+    print(src.count)
 
     # Define the size of the patches (in pixels)
     patch_width = 224

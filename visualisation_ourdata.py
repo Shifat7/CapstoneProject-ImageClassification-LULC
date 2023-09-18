@@ -3,6 +3,7 @@
 import argparse
 import json
 import os
+import csv
 import random
 import numpy as np
 import torch
@@ -65,61 +66,86 @@ val_dataset = DFCDataset(
     seed=data_config['seed'],
 )
 
-# SAMPLE CODE FOR SEGMENTATION OUTPUT
 
 # create a new model's instance
 model = DoubleSwinTransformerSegmentationS2(s2_backbone, out_dim=data_config['num_classes'], device=device)
 
-# EVENTUALLY iterate through all patches here (include all subsequent code in loop starting here)
-
-# load desired segmentation checkpoint
+# load desired segmentation checkpoint (pick in GUI)
 model.load_state_dict(torch.load("checkpoints/swin-t-pixel-classification-charmed-puddle-99-epoch-4.pth", map_location='cpu')) # replace path with desired checkpoint
 model.to(device)
 
-# prepare input
+# array of patch names (feed in from input.csv file or pick in GUI)
+patch_names = ['patch_3360_7168', 'patch_3360_6944']
 
-# select a single patch from MPC data
-patch_file = 'Patch_Cropper/patches_test/patch_3360_7168.tif'
+for patch_name in patch_names:
 
-# adapted from dfc_sen12ms_dataset
-with rasterio.open(patch_file) as patch:
-    patch_data = patch.read()
-    bounds = patch.bounds
+    #patch_file = f'Patch_Cropper/patches_test/{patch_name}.tif'
+    patch_file = os.path.join('Patch_Cropper', 'patches_test', f'{patch_name}.tif')
 
-mpc_tensor = torch.from_numpy(patch_data.astype('float32'))
+    # adapted from dfc_sen12ms_dataset
+    with rasterio.open(patch_file) as patch:
+        patch_data = patch.read()
+        bounds = patch.bounds
 
-# Code for normalisation of patch - credit dfc_dataset.py
-s2_maxs = []
-for b_idx in range(mpc_tensor.shape[0]):
-    s2_maxs.append(
-        torch.ones((mpc_tensor.shape[-2], mpc_tensor.shape[-1])) * mpc_tensor[b_idx].max().item() + 1e-5
-    )
-s2_maxs = torch.stack(s2_maxs)
+    mpc_tensor = torch.from_numpy(patch_data.astype('float32'))
 
-mpc_tensor = mpc_tensor / s2_maxs
+    # Code for normalisation of patch - credit dfc_dataset.py
+    s2_maxs = []
+    for b_idx in range(mpc_tensor.shape[0]):
+        s2_maxs.append(
+            torch.ones((mpc_tensor.shape[-2], mpc_tensor.shape[-1])) * mpc_tensor[b_idx].max().item() + 1e-5
+        )
+    s2_maxs = torch.stack(s2_maxs)
 
-#mpc_tensor = mpc_tensor[None, :, :, :] has same function as the below
-mpc_tensor = torch.unsqueeze(mpc_tensor, 0)
+    mpc_tensor = mpc_tensor / s2_maxs
 
-print(mpc_tensor)
-print(mpc_tensor.shape) # output is now [1, 13, 224, 224] as desired
+    mpc_tensor = torch.unsqueeze(mpc_tensor, 0) # add dimension at first position
 
-patch_img = {"s2": mpc_tensor} # create dictionary using same format as DFC
+    print(mpc_tensor)
+    print(mpc_tensor.shape) # output is now [1, 13, 224, 224] as desired
 
-# evaluate using model
-model.eval() # sets the model in evaluation mode
-output = model(patch_img) # pass input to model, 'output' is instance of DoubleSwinTransformerSegmentation
-#output = model(img)
+    patch_img = {"s2": mpc_tensor} # create dictionary using same format as DFC
 
-test = torch.max(output, dim=1)
-#print(test.indices)
+    # evaluate using model
+    model.eval() # sets the model in evaluation mode
+    output = model(patch_img) # pass input to model, 'output' is instance of DoubleSwinTransformerSegmentation
+    #output = model(img)
 
-output_arrays = test.indices.squeeze()
+    test = torch.max(output, dim=1)
+    #print(test.indices)
 
-# VISUALISATION CODE
-val_dataset.test_visual_mpc(mpc_tensor, output_arrays)
+    output_arrays = test.indices.squeeze()
 
-# for each pixel in image patch,
-    # open CSV write
-    # write coordinate info? and classification category (integer) to CSV file
-    # close CSV write
+    # VISUALISATION CODE
+    val_dataset.test_visual_mpc(mpc_tensor, output_arrays)
+
+
+    # CSV OUTPUT
+
+    # Create the "output" folder if it doesn't exist
+    output_folder = "output"
+    os.makedirs(output_folder, exist_ok=True)
+
+    # Get the filename of the current TIF patch
+    tif_filename = patch_name
+
+    # Remove the file extension to use as data_info
+    data_info = os.path.splitext(tif_filename)[0]
+
+    # Generate the dynamic CSV filename
+    csv_filename = os.path.join(output_folder, f"output_data_{data_info}.csv")
+
+    # Create a CSV file inside the "output" folder for writing
+    with open(csv_filename, mode='w', newline='') as csv_file:
+        csv_writer = csv.writer(csv_file)
+        
+        # Loop through the rows of output_arrays
+        for row in output_arrays:
+            # Convert tensor elements to Python scalars and write each element to the CSV file
+            row_elements = [i.item() for i in row]
+            csv_writer.writerow(row_elements)
+            
+    # Print a message indicating the CSV file was created
+    print(f"CSV file '{csv_filename}' created.")
+
+    # Create GeoTiff here too?

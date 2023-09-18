@@ -10,3 +10,6 @@ Patch_Cropper/*.tif
 Data_Downloader/*.tif
 Data_Downloader/LargeStackedTifs
 Data_Downloader/DataFolder
+output/*
+output_tif/*
+*.pyc
