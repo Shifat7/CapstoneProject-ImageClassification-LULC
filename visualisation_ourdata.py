@@ -1,30 +1,21 @@
 # Credit to SSLTransformerRS GitHub repo
 
-import argparse
 import json
 import os
 import csv
-import random
 import numpy as np
 import torch
-import wandb
 import torch.nn.functional as F
 import torch.nn as nn
 from distutils.util import strtobool
 from tqdm import tqdm
 from torchvision.models import resnet18, resnet50
-
-# New set for visualisation test
-import matplotlib.pyplot as plt
-from mpl_toolkits.axes_grid1 import make_axes_locatable
-from dfc_sen12ms_dataset import DFCSEN12MSDataset, Seasons, S1Bands, S2Bands, LCBands
-
 import rasterio
 
 from dfc_dataset_sandbox import DFCDataset # use sandbox version
 
 from Transformer_SSL.models.swin_transformer import * # refine to classes required
-from utils import save_checkpoint_single_model, dotdictify
+from utils import dotdictify
 from Transformer_SSL.models import build_model
 
 if torch.cuda.is_available():
