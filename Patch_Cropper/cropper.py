@@ -3,7 +3,7 @@ from rasterio.windows import Window
 import os
 
 # Create a folder to store the cropped patches
-output_folder = 'patches'
+output_folder = 'patches_test'
 os.makedirs(output_folder, exist_ok=True)
 
 # Folder containing the input GeoTIFF files

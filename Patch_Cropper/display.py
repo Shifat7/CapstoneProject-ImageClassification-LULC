@@ -2,7 +2,7 @@ import rasterio
 import matplotlib.pyplot as plt
 
 # Can replace with the path to any of the patch files
-patch_file = 'patches/patch_0_224.tif'
+patch_file = 'patches_test/patch_0_0.tif'
 
 # Open the patch file
 with rasterio.open(patch_file) as src:

@@ -28,3 +28,18 @@ for csv_file in os.listdir(input_folder):
 
         # Define the output GeoTIFF file name
         output_tiff = os.path.join(output_folder, f"{os.path.splitext(csv_file)[0]}.tif")
+
+        # Define GeoTIFF output parameters
+        width, height = output_data.shape[1], output_data.shape[0]
+
+        # Write the Numpy array to a GeoTIFF
+        with rasterio.open(
+            output_tiff,
+            "w",
+            driver="GTiff",
+            width=width,
+            height=height,
+            count=1,
+            dtype=output_data.dtype,
+        ) as dst:
+            dst.write(output_data, 1)
