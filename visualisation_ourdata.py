@@ -111,6 +111,11 @@ for patch_name in patch_names:
     val_dataset.test_visual_mpc(mpc_tensor, output_arrays)
 
 
+    # Get the spatial information from the GeoTIFF file
+    with rasterio.open(patch_file) as current_patch:
+        metadata = current_patch.meta
+        transform = current_patch.transform
+
     # CSV OUTPUT
 
     # Create the "output" folder if it doesn't exist
@@ -129,12 +134,22 @@ for patch_name in patch_names:
     # Create a CSV file inside the "output" folder for writing
     with open(csv_filename, mode='w', newline='') as csv_file:
         csv_writer = csv.writer(csv_file)
-        
+    
+        # Write a header row with column names
+        csv_writer.writerow(["Latitude", "Longitude", "Class"])
+    
         # Loop through the rows of output_arrays
-        for row in output_arrays:
-            # Convert tensor elements to Python scalars and write each element to the CSV file
-            row_elements = [i.item() for i in row]
-            csv_writer.writerow(row_elements)
+        for row_index, row in enumerate(output_arrays):
+            for col_index, class_value in enumerate(row):
+                # Calculate the geographic coordinates for each pixel
+                pixel_coordinates = transform * (col_index, row_index)
+            
+                # Convert tensor element to a Python scalar
+                class_value_scalar = class_value.item()
+            
+                # Write the coordinates and class value to the CSV file
+                csv_writer.writerow([pixel_coordinates[0], pixel_coordinates[1], class_value_scalar])
+    
             
     # Print a message indicating the CSV file was created
     print(f"CSV file '{csv_filename}' created.")
