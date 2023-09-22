@@ -111,12 +111,13 @@ for patch_name in patch_names:
     val_dataset.test_visual_mpc(mpc_tensor, output_arrays)
 
 
+    
+    # CSV OUTPUT
+
     # Get the spatial information from the GeoTIFF file
     with rasterio.open(patch_file) as current_patch:
         metadata = current_patch.meta
         transform = current_patch.transform
-
-    # CSV OUTPUT
 
     # Create the "output" folder if it doesn't exist
     output_folder = "output"
