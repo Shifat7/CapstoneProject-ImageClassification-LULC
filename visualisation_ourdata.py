@@ -155,4 +155,23 @@ for patch_name in patch_names:
     # Print a message indicating the CSV file was created
     print(f"CSV file '{csv_filename}' created.")
 
-    # Create GeoTiff here too?
+    # ADD BAND TO GEOTIFF WITH SEGMENTATION CLASSES
+
+    # Create a new GeoTIFF file with an additional band for segmentation classes 
+    # We can setup to overwrite the old patch here or delete the old patch after to save space
+    output_tif_filename = os.path.join(output_folder, f"output_patch_{patch_name}.tif")
+
+    # Create a copy of the input patch as a starting point for the output patch
+    with rasterio.open(patch_file) as input_patch:
+        output_meta = input_patch.meta
+        output_meta['count'] += 1  # Increment the number of bands for the new class band
+
+        with rasterio.open(output_tif_filename, 'w', **output_meta) as output_patch:
+            # Copy the existing bands to the new GeoTIFF
+            for i in range(1, input_patch.count + 1):
+                output_patch.write(input_patch.read(i), i)
+
+            # Add the segmentation classes as an additional band (band number is input_patch.count + 1)
+            output_patch.write(output_arrays, input_patch.count + 1)
+
+    print(f"GeoTIFF file '{output_tif_filename}' created.")
