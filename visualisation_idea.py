@@ -13,6 +13,10 @@ import torch.nn as nn
 from distutils.util import strtobool
 from tqdm import tqdm
 from torchvision.models import resnet18, resnet50
+import rasterio
+from rasterio.transform import from_origin
+from rasterio.coords import BoundingBox
+
 
 # New set for visualisation test
 import matplotlib.pyplot as plt
@@ -114,28 +118,85 @@ val_dataset.test_visual(currentPatch, output_arrays)
 output_folder = "output"
 os.makedirs(output_folder, exist_ok=True)
 
-# Get the filename of the current TIF patch
-tif_filename = f"ROIs0000_{data_config['val_mode']}_dfc_0_p{currentPatch}.tif"
+# Define the full path to the TIFF file
+tif_filename = "splits/ROIs0000_test/dfc_0/ROIs0000_test_dfc_0_p45.tif"
 
-# Remove the file extension to use as data_info
-data_info = os.path.splitext(tif_filename)[0]
+# Extract data_info from the TIFF filename
+data_info = os.path.splitext(os.path.basename(tif_filename))[0]
 
-# Generate the dynamic CSV filename
-csv_filename = os.path.join(output_folder, f"output_data_{data_info}.csv")
+# Open the current patch using rasterio to obtain its CRS and bounds
+with rasterio.open(tif_filename) as current_patch:
+    crs = current_patch.crs
+    bounds = current_patch.bounds
+    transform = current_patch.transform  # GeoTransform
 
-# Create a CSV file inside the "output" folder for writing
-with open(csv_filename, mode='w', newline='') as csv_file:
-    csv_writer = csv.writer(csv_file)
-    
-    # Loop through the rows of output_arrays
-    for row in output_arrays:
-        # Convert tensor elements to Python scalars and write each element to the CSV file
-        row_elements = [i.item() for i in row]
-        csv_writer.writerow(row_elements)
-        
-# Print a message indicating the CSV file was created
-print(f"CSV file '{csv_filename}' created.")
+    # Calculate real-world coordinates for the top-left corner of the patch
+    lon, lat = transform * (0, 0)
+
+    # Calculate real-world coordinates for the center of the patch (adjust as needed)
+    center_lon, center_lat = transform * (current_patch.width / 2, current_patch.height / 2)
+
+    # Generate the dynamic CSV filename
+    csv_filename = os.path.join(output_folder, f"output_data_{data_info}.csv")
+
+    # Create a CSV file inside the output folder for writing
+    with open(csv_filename, mode='w', newline='') as csv_file:
+        csv_writer = csv.writer(csv_file)
+
+        # Loop through the rows of output_arrays
+        for y in range(output_arrays.shape[0]):
+            for x in range(output_arrays.shape[1]):
+                # Calculate the geographic coordinates within the patch
+                lon_pixel, lat_pixel = transform * (x + 0.5, y + 0.5)  # Use center of each pixel
+
+                # Get the classification category
+                category = output_arrays[y, x].item()
+
+                # Write the geographic coordinates and category to the CSV file
+                csv_writer.writerow([lon_pixel, lat_pixel, category])
+
+    # Print a message indicating the CSV file was created
+    print(f"CSV file '{csv_filename}' created.")
+
+
+
+tif_filename = "splits/ROIs0000_test/dfc_0/ROIs0000_test_dfc_0_p45.tif"
+
+with rasterio.open(tif_filename) as current_patch:
+    metadata = current_patch.meta
+    print(metadata)
 
 
 # 13/08/2023 - need to train a new segmentation model, change path and load it
 # copy VM to new drive, likely faster
+
+# # Construct the file path for the GeoTIFF file based on currentPatch
+# tif_filename = f"ROIs0000_{data_config['val_mode']}_dfc_0_p{currentPatch}.tif"
+
+# # Open the current patch using rasterio to obtain its CRS and bounds
+# with rasterio.open(tif_filename) as current_patch:
+#     crs = current_patch.crs
+#     bounds = current_patch.bounds
+
+# # Define the pixel size (replace with your actual values)
+# pixel_width = 10.0 
+# pixel_height = -10.0 
+
+# # Create the GeoTIFF file
+# geotiff_filename = os.path.join(output_folder, f"output_data_{data_info}.tif")
+
+# with rasterio.open(
+#     geotiff_filename,
+#     'w',
+#     driver='GTiff',
+#     height=output_arrays.shape[0],  # Set the height to match the number of rows in the output
+#     width=output_arrays.shape[1],   # Set the width to match the number of columns in the output
+#     count=1,  # Number of bands in the image
+#     dtype=output_arrays.dtype,     # Data type of the image (e.g., uint8, uint16, float32)
+#     crs=crs,               # Use the CRS obtained from the current patch
+#     transform=from_origin(bounds.left, bounds.top, pixel_width, pixel_height),  # GeoTransform
+# ) as dst:
+#     dst.write(output_arrays, 1)  # Write the segmentation results to the GeoTIFF
+
+# # Print a message indicating the GeoTIFF file was created
+# print(f"GeoTIFF file '{geotiff_filename}' created.")

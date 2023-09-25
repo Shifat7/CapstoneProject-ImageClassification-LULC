@@ -111,7 +111,13 @@ for patch_name in patch_names:
     val_dataset.test_visual_mpc(mpc_tensor, output_arrays)
 
 
+    
     # CSV OUTPUT
+
+    # Get the spatial information from the GeoTIFF file
+    with rasterio.open(patch_file) as current_patch:
+        metadata = current_patch.meta
+        transform = current_patch.transform
 
     # Create the "output" folder if it doesn't exist
     output_folder = "output"
@@ -129,14 +135,43 @@ for patch_name in patch_names:
     # Create a CSV file inside the "output" folder for writing
     with open(csv_filename, mode='w', newline='') as csv_file:
         csv_writer = csv.writer(csv_file)
-        
+    
+        # Write a header row with column names
+        csv_writer.writerow(["Latitude", "Longitude", "Class"])
+    
         # Loop through the rows of output_arrays
-        for row in output_arrays:
-            # Convert tensor elements to Python scalars and write each element to the CSV file
-            row_elements = [i.item() for i in row]
-            csv_writer.writerow(row_elements)
+        for row_index, row in enumerate(output_arrays):
+            for col_index, class_value in enumerate(row):
+                # Calculate the geographic coordinates for each pixel
+                pixel_coordinates = transform * (col_index, row_index)
+            
+                # Convert tensor element to a Python scalar
+                class_value_scalar = class_value.item()
+            
+                # Write the coordinates and class value to the CSV file
+                csv_writer.writerow([pixel_coordinates[0], pixel_coordinates[1], class_value_scalar])
+    
             
     # Print a message indicating the CSV file was created
     print(f"CSV file '{csv_filename}' created.")
 
-    # Create GeoTiff here too?
+    # ADD BAND TO GEOTIFF WITH SEGMENTATION CLASSES
+
+    # Create a new GeoTIFF file with an additional band for segmentation classes 
+    # We can setup to overwrite the old patch here or delete the old patch after to save space
+    output_tif_filename = os.path.join(output_folder, f"output_patch_{patch_name}.tif")
+
+    # Create a copy of the input patch as a starting point for the output patch
+    with rasterio.open(patch_file) as input_patch:
+        output_meta = input_patch.meta
+        output_meta['count'] += 1  # Increment the number of bands for the new class band
+
+        with rasterio.open(output_tif_filename, 'w', **output_meta) as output_patch:
+            # Copy the existing bands to the new GeoTIFF
+            for i in range(1, input_patch.count + 1):
+                output_patch.write(input_patch.read(i), i)
+
+            # Add the segmentation classes as an additional band (band number is input_patch.count + 1)
+            output_patch.write(output_arrays, input_patch.count + 1)
+
+    print(f"GeoTIFF file '{output_tif_filename}' created.")
