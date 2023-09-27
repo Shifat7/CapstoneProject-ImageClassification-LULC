@@ -66,19 +66,21 @@ model.load_state_dict(torch.load("checkpoints/swin-t-pixel-classification-charme
 model.to(device)
 
 # array of patch names (feed in from input.csv file or pick in GUI)
-patch_names = ['patch_3360_7168', 'patch_3360_6944']
+#patch_names = ['S2A_MSIL2A_20220108T002711_R016_T54HWF_20220110T213759_combined_01_01', 'S2A_MSIL2A_20220108T002711_R016_T54HWF_20220110T213759_combined_01_02']
+
+input_folder = os.path.join('Patch_Cropper', 'patches_test') # set input folder for complete data set (i.e., entire state)
+patch_names = [file for file in os.listdir(input_folder) if file.endswith('.tif')] # all patches under input directory
 
 for patch_name in patch_names:
 
-    #patch_file = f'Patch_Cropper/patches_test/{patch_name}.tif'
-    patch_file = os.path.join('Patch_Cropper', 'patches_test', f'{patch_name}.tif')
+    patch_file = os.path.join(input_folder, patch_name)
 
     # adapted from dfc_sen12ms_dataset
     with rasterio.open(patch_file) as patch:
         patch_data = patch.read()
         bounds = patch.bounds
 
-    mpc_tensor = torch.from_numpy(patch_data.astype('float32'))
+    mpc_tensor = torch.from_numpy(patch_data.astype('float32')) # create input tensor of float32 values
 
     # Code for normalisation of patch - credit dfc_dataset.py
     s2_maxs = []
@@ -159,7 +161,7 @@ for patch_name in patch_names:
 
     # Create a new GeoTIFF file with an additional band for segmentation classes 
     # We can setup to overwrite the old patch here or delete the old patch after to save space
-    output_tif_filename = os.path.join(output_folder, f"output_patch_{patch_name}.tif")
+    output_tif_filename = os.path.join(output_folder, f"output_patch_{patch_name}")
 
     # Create a copy of the input patch as a starting point for the output patch
     with rasterio.open(patch_file) as input_patch:
