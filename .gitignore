@@ -14,3 +14,5 @@ Data_Downloader/DataFolder
 output/*
 output_tif/*
 *.pyc
+__pycache__/
+__pycache__
