@@ -3,7 +3,7 @@ import rasterio
 from typing import Tuple, List
 from rasterio.warp import transform
 
-def get_patches_within_bbox(ne_corner: Tuple[float, float], sw_corner: Tuple[float, float], folder_path: str = 'output') -> List[str]:
+def get_patches_within_bbox(ne_corner: Tuple[float, float], sw_corner: Tuple[float, float], folder_path: str = 'output') -> List[str]: # Will need to modify to the folder storing the cropped pre-segmentation patches
     # Define the destination CRS as EPSG:4326 (WGS 84) 
     dst_crs = rasterio.crs.CRS.from_epsg(4326)
 
