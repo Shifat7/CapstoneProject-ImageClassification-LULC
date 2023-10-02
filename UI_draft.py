@@ -1,13 +1,19 @@
 import sys
+import os
+import numpy as np
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                              QHBoxLayout, QPushButton, QComboBox, QFileDialog,
-                             QFrame, QDateEdit, QCalendarWidget, QLabel)
+                             QFrame, QDateEdit, QCalendarWidget, QLabel, QSizePolicy, QListWidget)
 from PyQt5.QtGui import QPalette, QColor, QPainter, QBrush, QPixmap
 from PyQt5.QtCore import Qt, QDate, pyqtSlot, QObject
 from PyQt5.QtWebEngineWidgets import QWebEngineView
 from PyQt5.QtWebChannel import QWebChannel
+from visualisation_ourdata import main
+# from pie_chart_gui import PieChartDemo
 
 class RoundedSquare(QFrame):
+
+
     def __init__(self, color, parent=None):
         super(RoundedSquare, self).__init__(parent)
         self.color = color
@@ -22,11 +28,17 @@ class RoundedSquare(QFrame):
 
 class DesktopUI(QMainWindow):
     def __init__(self):
+        print("list object created")  
+        super().__init__()
+        self.patch_folder = 'Patch_Cropper/patches_test'
+        self.init_ui()
+
+    def init_ui(self):
         super(DesktopUI, self).__init__()
 
         # Window setup
         self.setWindowTitle("Desktop UI")
-        self.setFixedSize(900, 450)
+        self.setFixedSize(520, 450)
 
         # Setting the main layout
         main_layout = QHBoxLayout()
@@ -41,6 +53,11 @@ class DesktopUI(QMainWindow):
         self.model_dropdown.addItem("Select Model")
         self.model_dropdown.addItem("SwinUnet")
         col1_layout.addWidget(self.model_dropdown)
+
+        list_patches_btn = QPushButton("List Current Patches")
+        list_patches_btn.setStyleSheet("background-color: transparent; color: white; font-size: 14px;")
+        list_patches_btn.clicked.connect(self.display_patches)
+        col1_layout.addWidget(list_patches_btn, alignment=Qt.AlignCenter)
         
         file_btn = QPushButton("Select Patches")
         file_btn.setStyleSheet("background-color: transparent; color: white; font-size: 14px;")
@@ -57,62 +74,55 @@ class DesktopUI(QMainWindow):
         main_layout.addWidget(col1_frame)
 
         # Column 2
-        col2_layout = QHBoxLayout()
+        col2_layout = QVBoxLayout()
 
-        # Square 1
+         # Square 1
         square1_layout = QVBoxLayout()
-        square1_layout.setAlignment(Qt.AlignCenter)  # Center align content
+        # square1_layout.setAlignment(Qt.AlignCenter)  
+        self.list_widget = QListWidget(self)
+        self.list_widget.setSelectionMode(QListWidget.MultiSelection)  
+        square1_layout.addWidget(self.list_widget)
 
-        
-        self.date_picker = QDateEdit(calendarPopup=True)
-        self.date_picker.setCalendarWidget(QCalendarWidget())
-        self.date_picker.setDate(QDate.currentDate())
-        square1_layout.addWidget(self.date_picker, alignment=Qt.AlignCenter)
+        select_all_button = QPushButton('Select All', self)
+        select_all_button.clicked.connect(self.select_all_patches)
+        square1_layout.addWidget(select_all_button)
 
-        
-        self.image_label = QLabel()
-        self.image_label.setAlignment(Qt.AlignCenter)
-        square1_layout.addWidget(self.image_label)
+        # self.image_label = QLabel()
+        # self.image_label.setAlignment(Qt.AlignCenter)
+        # square1_layout.addWidget(self.image_label)
 
-        
-        segment_btn = QPushButton("Start Segmentation")
+        # square1_layout.addStretch()  
+
+        segment_btn = QPushButton('Start Segmentation', self)
+        segment_btn.clicked.connect(self.segment_patches)
         square1_layout.addWidget(segment_btn, alignment=Qt.AlignCenter)
+
+        # Control buttons 
+        control_layout = QHBoxLayout()
+        btn_style = "font-size: 10px; width: 10px; height: 10px;"  
+        stop_btn = QPushButton("■")
+        stop_btn.setStyleSheet(btn_style)
+        # stop_btn.clicked.connect(self.stop_segmentation)
+
+        pause_btn = QPushButton("❙❙")
+        pause_btn.setStyleSheet(btn_style)
+        # pause_btn.clicked.connect(self.pause_segmentation)
+
+        play_btn = QPushButton("▶")
+        play_btn.setStyleSheet(btn_style)
+        play_btn.clicked.connect(self.segment_patches)
+        
+        control_layout.addWidget(stop_btn)
+        control_layout.addWidget(pause_btn)
+        control_layout.addWidget(play_btn)
+
+        square1_layout.addLayout(control_layout)
 
         square1 = RoundedSquare("white")
         square1.setLayout(square1_layout)
         square1.setFixedSize(324, 400)
         col2_layout.addWidget(square1)
 
-        # Square 2
-        square2_layout = QVBoxLayout()
-
-        # Control buttons 
-        control_layout = QHBoxLayout()
-        btn_style = "font-size: 14px; width: 54px;"  
-        stop_btn = QPushButton("■")
-        stop_btn.setStyleSheet(btn_style)
-        stop_btn.clicked.connect(self.stop_segmentation)
-
-        pause_btn = QPushButton("❙❙")
-        pause_btn.setStyleSheet(btn_style)
-        pause_btn.clicked.connect(self.pause_segmentation)
-
-        play_btn = QPushButton("▶")
-        play_btn.setStyleSheet(btn_style)
-        play_btn.clicked.connect(self.start_segmentation)
-        
-        control_layout.addWidget(stop_btn)
-        control_layout.addWidget(pause_btn)
-        control_layout.addWidget(play_btn)
-
-        square2_layout.addLayout(control_layout)
-        square2_layout.addStretch(1)
-
-        square2 = RoundedSquare("white")
-        square2.setLayout(square2_layout)
-        square2.setFixedSize(324, 400)
-        col2_layout.addWidget(square2)
-        
         col2_frame = QFrame()
         col2_frame.setLayout(col2_layout)
         main_layout.addWidget(col2_frame)
@@ -125,17 +135,25 @@ class DesktopUI(QMainWindow):
         self.setCentralWidget(central_widget)
 
         # Connecting buttons to their respective slots
-        segment_btn.clicked.connect(self.start_segmentation)
+        # segment_btn.clicked.connect(self.start_segmentation)
 
-    def start_segmentation(self):
-        selected_date = self.date_picker.date().toString()
-        selected_model = self.model_dropdown.currentText()
-        selected_patches = "Sample Patches"  # As an example
-        
-        print(f"Selected Date: {selected_date}")
-        print(f"Selected Model: {selected_model}")
-        print(f"Selected Patches: {selected_patches}")
-        print("Starting segmentation...")
+    def display_patches(self):
+        print("Display patches function called")  # Debugging line
+        patch_names = [file for file in os.listdir(self.patch_folder) if file.endswith('.tif')]
+        self.list_widget.addItems(patch_names)
+    
+    def select_all_patches(self):
+        self.list_widget.selectAll()
+
+    def segment_patches(self):
+        print("Segment patches function called")  # Debugging line
+        selected_items = self.list_widget.selectedItems()
+        if not selected_items:
+            print("No patch selected!")
+            return
+
+        selected_patch_names = [item.text() for item in selected_items]
+        main(selected_patch_names)
 
     def stop_segmentation(self):
         print("Segmentation stopped!")
