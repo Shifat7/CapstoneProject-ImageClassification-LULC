@@ -62,7 +62,7 @@ val_dataset = DFCDataset(
 model = DoubleSwinTransformerSegmentationS2(s2_backbone, out_dim=data_config['num_classes'], device=device)
 
 # load desired segmentation checkpoint (pick in GUI)
-model.load_state_dict(torch.load("checkpoints/swin-t-pixel-classification-charmed-puddle-99-epoch-4.pth", map_location='cpu')) # replace path with desired checkpoint
+model.load_state_dict(torch.load("checkpoints/swin-t-pixel-classification-final-epoch-200.pth", map_location='cpu')) # replace path with desired checkpoint
 model.to(device)
 
 # array of patch names (feed in from input.csv file or pick in GUI)
@@ -96,6 +96,55 @@ for patch_name in patch_names:
 
     print(mpc_tensor)
     print(mpc_tensor.shape) # output is now [1, 13, 224, 224] as desired
+
+    # if the patch is smaller than standard size
+    if mpc_tensor.shape != [1, 13, 224, 224]:
+        x_l = 224 - mpc_tensor.size(dim=2) # amount needing to be added to x
+        y_l = 224 - mpc_tensor.size(dim=3) # amount needing to be added to y
+        
+        a = True
+        try: 
+            mpc_tensor[0, 1, 0, 223]
+        except:
+            a = False
+        
+        b = True
+        try: 
+            mpc_tensor[0, 1, 223, 223]
+        except:
+            b = False
+        
+        c = True
+        try: 
+            mpc_tensor[0, 1, 0, 0]
+        except:
+            c = False
+        
+        d = True
+        try: 
+            mpc_tensor[0, 1, 223, 0]
+        except:
+            d = False
+        
+        if a and b: # if (1, 224) and (224, 224) exist [bottom edge]
+            mpc_tensor = F.pad(mpc_tensor, (y_l, 0, 0, 0, 0, 0, 0, 0), "constant", 0) # prepend difference to y
+        elif c and d: # if (1, 1) and (224, 1) exist [top edge]
+            mpc_tensor = F.pad(mpc_tensor, (0, y_l, 0, 0, 0, 0, 0, 0), "constant", 0) # append difference to y
+        elif b and d: # if (224, 224) and (224, 1) exist [right edge]
+            mpc_tensor = F.pad(mpc_tensor, (0, 0, x_l, 0, 0, 0, 0, 0), "constant", 0) # prepend difference to x
+        elif c and a: # if (1, 1) and (1, 224) exist [left edge]
+            mpc_tensor = F.pad(mpc_tensor, (0, 0, 0, x_l, 0, 0, 0, 0), "constant", 0) # append difference to x
+        else:
+            if a: # if (1, 224) exists
+                mpc_tensor = F.pad(mpc_tensor, (y_l, 0, 0, x_l, 0, 0, 0, 0), "constant", 0) # append difference to x, prepend differece to y | note values in sequence are flipped
+            elif b: # if (224, 224) exists
+                mpc_tensor = F.pad(mpc_tensor, (y_l, 0, x_l, 0, 0, 0, 0, 0), "constant", 0) # prepend difference to x, prepend difference to y
+            elif d: # check (224, 1) exists
+                mpc_tensor = F.pad(mpc_tensor, (0, y_l, x_l, 0, 0, 0, 0, 0), "constant", 0) # prepend difference to x, append difference to y
+            elif c: # check (1, 1) exists
+                mpc_tensor = F.pad(mpc_tensor, (0, y_l, 0, x_l, 0, 0, 0, 0), "constant", 0) # append difference to x, append difference to y
+        print(mpc_tensor)
+        print(mpc_tensor.shape)
 
     patch_img = {"s2": mpc_tensor} # create dictionary using same format as DFC
 
