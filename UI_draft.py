@@ -8,12 +8,10 @@ from PyQt5.QtGui import QPalette, QColor, QPainter, QBrush, QPixmap
 from PyQt5.QtCore import Qt, QDate, pyqtSlot, QObject
 from PyQt5.QtWebEngineWidgets import QWebEngineView
 from PyQt5.QtWebChannel import QWebChannel
-from visualisation_ourdata import main
-# from pie_chart_gui import PieChartDemo
+from visualisation_ourdata import SegmentationThread 
+from pie_chart_gui import PieChartDemo
 
 class RoundedSquare(QFrame):
-
-
     def __init__(self, color, parent=None):
         super(RoundedSquare, self).__init__(parent)
         self.color = color
@@ -38,10 +36,11 @@ class DesktopUI(QMainWindow):
 
         # Window setup
         self.setWindowTitle("Desktop UI")
-        self.setFixedSize(520, 450)
+        self.resize(550, 450)
 
         # Setting the main layout
-        main_layout = QHBoxLayout()
+        self.main_layout = QHBoxLayout()
+
 
         # Column 1
         col1_layout = QVBoxLayout()
@@ -50,8 +49,8 @@ class DesktopUI(QMainWindow):
         self.model_dropdown = QComboBox()
         self.model_dropdown.setFocusPolicy(Qt.NoFocus)
         self.model_dropdown.setStyleSheet("background-color: transparent; color: white; font-size: 14px;")
-        self.model_dropdown.addItem("Select Model")
         self.model_dropdown.addItem("SwinUnet")
+        # self.model_dropdown.addItem("SwinUnet")
         col1_layout.addWidget(self.model_dropdown)
 
         list_patches_btn = QPushButton("List Current Patches")
@@ -71,7 +70,7 @@ class DesktopUI(QMainWindow):
         palette = col1_frame.palette()
         palette.setColor(QPalette.Window, QColor("darkgreen"))
         col1_frame.setPalette(palette)
-        main_layout.addWidget(col1_frame)
+        self.main_layout.addWidget(col1_frame)
 
         # Column 2
         col2_layout = QVBoxLayout()
@@ -87,12 +86,6 @@ class DesktopUI(QMainWindow):
         select_all_button.clicked.connect(self.select_all_patches)
         square1_layout.addWidget(select_all_button)
 
-        # self.image_label = QLabel()
-        # self.image_label.setAlignment(Qt.AlignCenter)
-        # square1_layout.addWidget(self.image_label)
-
-        # square1_layout.addStretch()  
-
         segment_btn = QPushButton('Start Segmentation', self)
         segment_btn.clicked.connect(self.segment_patches)
         square1_layout.addWidget(segment_btn, alignment=Qt.AlignCenter)
@@ -102,15 +95,15 @@ class DesktopUI(QMainWindow):
         btn_style = "font-size: 10px; width: 10px; height: 10px;"  
         stop_btn = QPushButton("■")
         stop_btn.setStyleSheet(btn_style)
-        # stop_btn.clicked.connect(self.stop_segmentation)
+        stop_btn.clicked.connect(self.stop_segmentation)
 
         pause_btn = QPushButton("❙❙")
         pause_btn.setStyleSheet(btn_style)
-        # pause_btn.clicked.connect(self.pause_segmentation)
+        pause_btn.clicked.connect(self.pause_segmentation)
 
         play_btn = QPushButton("▶")
         play_btn.setStyleSheet(btn_style)
-        play_btn.clicked.connect(self.segment_patches)
+        play_btn.clicked.connect(self.start_segmentation)
         
         control_layout.addWidget(stop_btn)
         control_layout.addWidget(pause_btn)
@@ -125,20 +118,18 @@ class DesktopUI(QMainWindow):
 
         col2_frame = QFrame()
         col2_frame.setLayout(col2_layout)
-        main_layout.addWidget(col2_frame)
+        self.main_layout.addWidget(col2_frame)
 
-        main_layout.setStretch(0, 2)
-        main_layout.setStretch(1, 8)
+        # main_layout.setStretch(0, 2)
+        # main_layout.setStretch(1, 8)
 
         central_widget = QWidget()
-        central_widget.setLayout(main_layout)
+        central_widget.setLayout(self.main_layout)
         self.setCentralWidget(central_widget)
 
-        # Connecting buttons to their respective slots
-        # segment_btn.clicked.connect(self.start_segmentation)
 
     def display_patches(self):
-        print("Display patches function called")  # Debugging line
+        print("Display patches function called")  
         patch_names = [file for file in os.listdir(self.patch_folder) if file.endswith('.tif')]
         self.list_widget.addItems(patch_names)
     
@@ -146,20 +137,78 @@ class DesktopUI(QMainWindow):
         self.list_widget.selectAll()
 
     def segment_patches(self):
-        print("Segment patches function called")  # Debugging line
+        print("Segment patches function called")  
         selected_items = self.list_widget.selectedItems()
         if not selected_items:
             print("No patch selected!")
             return
 
         selected_patch_names = [item.text() for item in selected_items]
-        main(selected_patch_names)
+        self.segmentation_thread = SegmentationThread(selected_patch_names)
+        self.segmentation_thread.finishedSignal.connect(self.on_segmentation_finished)
+        self.segmentation_thread.errorSignal.connect(self.on_segmentation_error)
+        self.segmentation_thread.start()
 
-    def stop_segmentation(self):
-        print("Segmentation stopped!")
+    def display_pie_chart(self):
+        output_arrays = np.load('npy_outputs/all_output_arrays.npy')
+        unique_elements, counts_elements = np.unique(output_arrays, return_counts=True)
+        total_count = np.sum(counts_elements)
+        class_mapping = {
+            0: "Forest",
+            1: "Shrubland",
+            2: "Grassland",
+            3: "Wetlands",
+            4: "Croplands",
+            5: "Urban/Built-up",
+            6: "Barren",
+            7: "Water",
+            255: "Invalid",
+        }
+        data = {class_mapping[label]: (count / total_count) * 100 for label, count in zip(unique_elements, counts_elements) if label in class_mapping}
+
+        # Initialize the PieChartDemo
+        if hasattr(self, 'pie_chart_gui'):
+            self.pie_chart_gui.setParent(None)  
+            self.pie_chart_gui.deleteLater() 
+        
+        self.pie_chart_gui = PieChartDemo(data)
+        # self.pie_chart_gui.setFixedSize(350, 400)
+        self.pie_chart_gui.setStyleSheet("border: none;")
+
+        self.main_layout.addWidget(self.pie_chart_gui)
+
+        self.update()
+        self.resize(1200, 500)
+
+    # Slot to handle the signal when segmentation finishes
+    def on_segmentation_finished(self):
+        self.display_pie_chart()
+
+    # Slot to handle the signal on segmentation error
+    def on_segmentation_error(self, error_message):
+        print(f"Error: {error_message}")
+
+    # Connect these functions to the respective buttons in your GUI:
+
+    def start_segmentation(self):
+    
+        if not hasattr(self, 'segmentation_thread') or not self.segmentation_thread.isRunning():
+            print("Starting a new thread")
+            self.segmentation_thread = SegmentationThread(self.selected_patch_names)
+            self.segmentation_thread.start()
+        else:
+            print("Resuming thread")
+            self.segmentation_thread.resume()
 
     def pause_segmentation(self):
-        print("Segmentation paused!")
+        if hasattr(self, 'segmentation_thread'):
+            print("pause button")
+            self.segmentation_thread.pause()
+
+    def stop_segmentation(self):
+        if hasattr(self, 'segmentation_thread'):
+            print("stop button pressed")
+            self.segmentation_thread.stop()
 
     def open_map_dialog(self):
         self.map_window = QMainWindow(self)
