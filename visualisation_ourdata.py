@@ -18,13 +18,13 @@ from Transformer_SSL.models.swin_transformer import * # refine to classes requir
 from utils import dotdictify
 from Transformer_SSL.models import build_model
 from PyQt5.QtCore import QThread, pyqtSignal
-from PyQt5.QtCore import QEventLoop
 import time
 
 
 class SegmentationThread(QThread):
     errorSignal = pyqtSignal(str)
     finishedSignal = pyqtSignal(str)
+    progressSignal = pyqtSignal(int)
 
     def __init__(self, patch_names):
         super(SegmentationThread, self).__init__()
@@ -90,7 +90,10 @@ class SegmentationThread(QThread):
                     # patch_names = [file for file in os.listdir(input_folder) if file.endswith('.tif')] # all patches under input directory
 
                 all_output_arrays = []
-                for patch_name in self.patch_names:
+                for index, patch_name in enumerate(self.patch_names):
+
+                        progress_percentage = int((index + 1) / len(self.patch_names) * 100)
+                        self.progressSignal.emit(progress_percentage)
 
                         patch_file = os.path.join(input_folder, patch_name)
 
@@ -283,4 +286,6 @@ class SegmentationThread(QThread):
 
     def stop(self):
         print("Setting stop flag.")
+        self.is_paused = False
         self.is_stopped = True
+        
