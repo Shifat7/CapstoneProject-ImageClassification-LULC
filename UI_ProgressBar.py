@@ -2,10 +2,10 @@ import sys
 import os
 import numpy as np
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
-                             QHBoxLayout, QPushButton, QComboBox, QFileDialog,
-                             QFrame,QProgressBar, QListWidget, QLabel)
+                             QHBoxLayout, QPushButton, QComboBox,
+                             QFrame, QLabel, QListWidget, QVBoxLayout, QLabel, QProgressBar)
 from PyQt5.QtGui import QPalette, QColor, QPainter, QBrush, QPixmap
-from PyQt5.QtCore import Qt, QDate, pyqtSlot, QObject
+from PyQt5.QtCore import Qt, QDate, pyqtSlot, QObject,QThread, pyqtSignal
 from PyQt5.QtWebEngineWidgets import QWebEngineView
 from PyQt5.QtWebChannel import QWebChannel
 from visualisation_ourdata import SegmentationThread 
@@ -24,13 +24,24 @@ class RoundedSquare(QFrame):
         painter.setPen(Qt.NoPen)
         painter.drawRoundedRect(0, 0, self.width(), self.height(), 10, 10)
 
+class WorkerThread(QThread):
+    progress_update = pyqtSignal(int)
+        
+        
+    def run(self):
+        for progress_value in range(0, 101):
+            self.progress_update.emit(progress_value)
+            self.msleep(20)  # Simulate a time-consuming operation
+
 class DesktopUI(QMainWindow):
     def __init__(self):
         print("list object created")  
         super().__init__()
         self.patch_folder = 'Patch_Cropper/patches_test'
-        self.selected_patch_names = []
         self.init_ui()
+        self.worker_thread = WorkerThread()
+        self.worker_thread.progress_update.connect(self.update_progress_bar)
+
 
     def init_ui(self):
         super(DesktopUI, self).__init__()
@@ -75,6 +86,8 @@ class DesktopUI(QMainWindow):
 
         # Column 2
         col2_layout = QVBoxLayout()
+        self.progress_bar = QProgressBar(self)
+        col2_layout.addWidget(self.progress_bar, alignment=Qt.AlignCenter)
 
          # Square 1
         square1_layout = QVBoxLayout()
@@ -120,16 +133,6 @@ class DesktopUI(QMainWindow):
         col2_frame = QFrame()
         col2_frame.setLayout(col2_layout)
         self.main_layout.addWidget(col2_frame)
-        
-        # process bar
-        self.progress_bar = QProgressBar(self)
-        self.progress_bar.setRange(0, 100)
-
-        self.progress_details_label = QLabel(self)
-
-        col2_layout.addWidget(self.progress_bar)
-        col2_layout.addWidget(self.progress_details_label)
-        
 
         # main_layout.setStretch(0, 2)
         # main_layout.setStretch(1, 8)
@@ -148,36 +151,37 @@ class DesktopUI(QMainWindow):
         self.list_widget.selectAll()
 
     def segment_patches(self):
-        print("Segmentation function called")  
+        print("Segment patches function called")  
         selected_items = self.list_widget.selectedItems()
         if not selected_items:
             print("No patch selected!")
             return
+        self.worker_thread.start()
+        
+        for progress_value in range(0, 101):
+            self.progress_bar.setValue(progress_value)
+            QApplication.processEvents()  # Process events to update the UI
+            # Perform your segmentation operation here
 
-        self.selected_patch_names = [item.text() for item in selected_items]
-        self.segmentation_thread = SegmentationThread(self.selected_patch_names)
-        self.segmentation_thread.progressSignal.connect(self.update_progress)
+        # Reset progress bar after segmentation is complete
+        self.progress_bar.setValue(0)
+        print("Segmentation completed!")        
+
+        selected_patch_names = [item.text() for item in selected_items]
+        self.segmentation_thread = SegmentationThread(selected_patch_names)
         self.segmentation_thread.finishedSignal.connect(self.on_segmentation_finished)
         self.segmentation_thread.errorSignal.connect(self.on_segmentation_error)
         self.segmentation_thread.start()
+        
 
-    def update_progress(self, value):
-        print(f"Number of patches selected: {self.selected_patch_names}")
-        if not hasattr(self, 'selected_patch_names'):
-            return
+    def update_progress_bar(self, value):
         self.progress_bar.setValue(value)
-        completed_patches = int(value / 100 * len(self.selected_patch_names))
-        self.progress_details_label.setText(f"{completed_patches}/{len(self.selected_patch_names)} patches processed")
-        self.segmentation_thread.resetProgressSignal.connect(self.reset_progress_bar)
 
-    def reset_progress_bar(self):
-        self.progress_bar.setValue(0)
-        self.progress_details_label.setText(f"0/{len(self.selected_patch_names)} patches")
-    
     def display_pie_chart(self):
         output_arrays = np.load('npy_outputs/all_output_arrays.npy')
         unique_elements, counts_elements = np.unique(output_arrays, return_counts=True)
         total_count = np.sum(counts_elements)
+        
         class_mapping = {
             0: "Forest",
             1: "Shrubland",
@@ -189,8 +193,21 @@ class DesktopUI(QMainWindow):
             7: "Water",
             255: "Invalid",
         }
+        
+        class_colours = {
+        0: QColor("green"),
+        1: QColor("blue"),
+        2: QColor("red"),
+        3: QColor("black"),
+        4: QColor("pink"),
+        5: QColor("blue"),
+        6: QColor("blue"),
+        7: QColor("blue"),
+        }
+        
         data = {class_mapping[label]: (count / total_count) * 100 for label, count in zip(unique_elements, counts_elements) if label in class_mapping}
 
+        
         # Initialize the PieChartDemo
         if hasattr(self, 'pie_chart_gui'):
             self.pie_chart_gui.setParent(None)  
@@ -207,14 +224,13 @@ class DesktopUI(QMainWindow):
 
     # Slot to handle the signal when segmentation finishes
     def on_segmentation_finished(self):
-        print("segmentation is running successfully")
         self.display_pie_chart()
 
     # Slot to handle the signal on segmentation error
     def on_segmentation_error(self, error_message):
         print(f"Error: {error_message}")
 
-    
+    # Connect these functions to the respective buttons in your GUI:
 
     def start_segmentation(self):
     
@@ -235,9 +251,6 @@ class DesktopUI(QMainWindow):
         if hasattr(self, 'segmentation_thread'):
             print("stop button pressed")
             self.segmentation_thread.stop()
-
-        # self.progress_bar.setValue(0)
-        # self.progress_details_label.setText(f"0/{len(self.selected_patch_names)} patches")
 
     def open_map_dialog(self):
         self.map_window = QMainWindow(self)

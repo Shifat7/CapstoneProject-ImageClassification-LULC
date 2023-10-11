@@ -449,8 +449,8 @@ class DFCDataset(Dataset):
         s2 = torch.squeeze(s2, 0)
         print(s2.shape)
         #dfc = sample.get("dfc") GET CLASSIFIED DFC DATA FROM SAMPLE
-
-        fig, axs = plt.subplots(1, 2, figsize=(25, 5)) # CHANGE SECOND PARAMETER TO ADJUST NUMBER OF ROWS OF SUBPLOTS
+        # fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(35, 5))
+        fig, axs = plt.subplots(1, 3, figsize=(15, 5)) # CHANGE SECOND PARAMETER TO ADJUST NUMBER OF ROWS OF SUBPLOTS
         img = np.moveaxis(s2.numpy(), 0, -1)
         img = img / img.max(axis=(0, 1))
         axs[0].imshow(img)
@@ -477,6 +477,36 @@ class DFCDataset(Dataset):
         axs[1].set_title("Inference Output")
         axs[1].axis(False)
 
+        unique, counts = np.unique(dfc_plot, return_counts=True)
+        labels = [DFC_map[int(u)] for u in unique if int(u) in DFC_map.keys()]
+        counts_normalized = counts / counts.sum()
+        bottom = 0
+        bar_width = 0.3  
+
+        for idx, (label, count) in enumerate(zip(labels, counts_normalized)):
+            axs[2].bar(0, count, bottom=bottom, label=label, width=bar_width)
+            # Display the percentage next to each section
+            percentage = "{:.1f}%".format(count*100)
+            axs[2].text(0.01, bottom + count/2, percentage, ha='center', va='center')
+            bottom += count
+
+        
+        axs[2].spines['right'].set_visible(False)
+        axs[2].spines['top'].set_visible(False)
+
+        axs[2].set_title("Distribution of Output Values", pad=10)  
+        axs[2].set_ylabel("Percentage")
+        axs[2].set_ylim(0, 1.2)  
+        axs[2].set_xlim(-0.5, 0.5)  
+        axs[2].text(0, 1.05, '100%', ha='center', va='center') 
+        axs[2].set_xticks([]) 
+        axs[2].set_yticks([])   
+        axs[2].set_xticklabels([])
+        axs[2].set_yticklabels([])   
+        axs[2].legend(loc="upper left", bbox_to_anchor=(1,1))
+
+        plt.tight_layout()
+            
         plt.show()
 
 
@@ -522,7 +552,7 @@ class DFCDataset(Dataset):
         s2 = sample.get("s2")
         dfc = sample.get("dfc")
 
-        fig, axs = plt.subplots(1, 2, figsize=(25, 5)) # CHANGE SECOND PARAMETER TO ADJUST NUMBER OF ROWS OF SUBPLOTS
+        fig, axs = plt.subplots(1, 2, figsize=(25, 5)) 
         img = np.moveaxis(s2.numpy(), 0, -1)
         img = img / img.max(axis=(0, 1))
         axs[0].imshow(img)
@@ -635,3 +665,5 @@ class DFCDataset(Dataset):
         else:
             axs[4].set_title("No HR LC available")
         plt.show()
+
+
