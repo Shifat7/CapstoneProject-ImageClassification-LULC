@@ -1,326 +1,293 @@
-import sys
+# Credit to SSLTransformerRS GitHub repo
+
+import json
 import os
+import csv
 import numpy as np
-from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
-                             QHBoxLayout, QPushButton, QComboBox, QFileDialog,
-                             QFrame,QProgressBar, QListWidget, QLabel)
-from PyQt5.QtGui import QPalette, QColor, QPainter, QBrush, QPixmap
-from PyQt5.QtCore import Qt, QDate, pyqtSlot, QObject
-from PyQt5.QtWebEngineWidgets import QWebEngineView
-from PyQt5.QtWebChannel import QWebChannel
-from visualisation_ourdata import SegmentationThread 
-from pie_chart_gui import PieChartDemo
+import torch
+import torch.nn.functional as F
+import torch.nn as nn
+from distutils.util import strtobool
+from tqdm import tqdm
+from torchvision.models import resnet18, resnet50
+import rasterio
 
-class RoundedSquare(QFrame):
-    def __init__(self, color, parent=None):
-        super(RoundedSquare, self).__init__(parent)
-        self.color = color
+from dfc_dataset_sandbox import DFCDataset # use sandbox version
 
-    def paintEvent(self, event):
-        painter = QPainter(self)
-        painter.setRenderHint(QPainter.Antialiasing)
-        brush = QBrush(QColor(self.color))
-        painter.setBrush(brush)
-        painter.setPen(Qt.NoPen)
-        painter.drawRoundedRect(0, 0, self.width(), self.height(), 10, 10)
-
-class DesktopUI(QMainWindow):
-    def __init__(self):
-        print("list object created")  
-        super().__init__()
-        self.patch_folder = 'Patch_Cropper/patches_test'
-        self.selected_patch_names = []
-        self.init_ui()
-
-    def init_ui(self):
-        super(DesktopUI, self).__init__()
-
-        # Window setup
-        self.setWindowTitle("Desktop UI")
-        self.resize(550, 450)
-
-        # Setting the main layout
-        self.main_layout = QHBoxLayout()
+from Transformer_SSL.models.swin_transformer import * # refine to classes required
+from utils import dotdictify
+from Transformer_SSL.models import build_model
+from PyQt5.QtCore import QThread, pyqtSignal
+import time
 
 
-        # Column 1
-        col1_layout = QVBoxLayout()
-        col1_layout.setAlignment(Qt.AlignCenter)
+class SegmentationThread(QThread):
+    errorSignal = pyqtSignal(str)
+    finishedSignal = pyqtSignal(str)
+    progressSignal = pyqtSignal(int)
+    resetProgressSignal = pyqtSignal()
 
-        self.model_dropdown = QComboBox()
-        self.model_dropdown.setFocusPolicy(Qt.NoFocus)
-        self.model_dropdown.setStyleSheet("background-color: transparent; color: white; font-size: 14px;")
-        self.model_dropdown.addItem("SwinUnet")
-        # self.model_dropdown.addItem("SwinUnet")
-        col1_layout.addWidget(self.model_dropdown)
+    def __init__(self, patch_names):
+        super(SegmentationThread, self).__init__()
+        self.patch_names = patch_names
+        self.is_stopped = False
+        self.is_paused = False
 
-        list_patches_btn = QPushButton("List Current Patches")
-        list_patches_btn.setStyleSheet("background-color: transparent; color: white; font-size: 14px;")
-        list_patches_btn.clicked.connect(self.display_patches)
-        col1_layout.addWidget(list_patches_btn, alignment=Qt.AlignCenter)
+    def run(self):
+        try:
+
+                print (self.patch_names)
+                if torch.cuda.is_available():
+                    device = torch.device("cuda")
+                else:
+                    device = torch.device("cpu:0")
+
+                with open("configs/backbone_config.json", "r") as fp: # need to include this file!!!
+                    swin_conf = dotdictify(json.load(fp))
+
+                s1_backbone = build_model(swin_conf.model_config)
+
+                swin_conf.model_config.MODEL.SWIN.IN_CHANS = 13
+                s2_backbone = build_model(swin_conf.model_config)
+
+                    # Data configurations:
+                data_config = {
+                        'train_dir': 'splits/', # path to the training directory, this is "ROIs0000_validation" as currently configured,
+                        'val_dir': 'splits/', # path to the validation directory, this is "ROIs0000_test" as currently configured,
+                        'train_mode': 'validation', # can be one of the following: 'test', 'validation'
+                        'val_mode': 'test', # can be one of the following: 'test', 'validation'
+                        'num_classes': 8, # number of classes in the dataset.
+                        'clip_sample_values': True, # clip (limit) values
+                        'train_used_data_fraction': 1, # fraction of data to use, should be in the range [0, 1]
+                        'val_used_data_fraction': 1,
+                        'image_px_size': 224, # image size (224x224)
+                        'cover_all_parts_train': True, # if True, if image_px_size is not 224 during training, we use a random crop of the image
+                        'cover_all_parts_validation': True, # if True, if image_px_size is not 224 during validation, we use a non-overlapping sliding window to cover the entire image
+                        'seed': 42,
+                    }
+
+                val_dataset = DFCDataset(
+                        data_config['val_dir'],
+                        mode=data_config['val_mode'],
+                        clip_sample_values=data_config['clip_sample_values'],
+                        used_data_fraction=data_config['val_used_data_fraction'],
+                        image_px_size=data_config['image_px_size'],
+                        cover_all_parts=data_config['cover_all_parts_validation'],
+                        seed=data_config['seed'],
+                    )
+
+
+                    # create a new model's instance
+                model = DoubleSwinTransformerSegmentationS2(s2_backbone, out_dim=data_config['num_classes'], device=device)
+
+                    # load desired segmentation checkpoint (pick in GUI)
+                model.load_state_dict(torch.load("swin-t-pixel-classification-final-epoch-200.pth", map_location='cpu')) # replace path with desired checkpoint
+                model.to(device)
+
+                    # array of patch names (feed in from input.csv file or pick in GUI)
+                    #patch_names = ['S2A_MSIL2A_20220108T002711_R016_T54HWF_20220110T213759_combined_01_01', 'S2A_MSIL2A_20220108T002711_R016_T54HWF_20220110T213759_combined_01_02']
+
+                input_folder = os.path.join('Patch_Cropper', 'patches_test') # set input folder for complete data set (i.e., entire state)
+                    # patch_names = [file for file in os.listdir(input_folder) if file.endswith('.tif')] # all patches under input directory
+
+                all_output_arrays = []
+                for index, patch_name in enumerate(self.patch_names):
+
+                        progress_percentage = int((index + 1) / len(self.patch_names) * 100)
+                        self.progressSignal.emit(progress_percentage)
+
+                        patch_file = os.path.join(input_folder, patch_name)
+
+                        # adapted from dfc_sen12ms_dataset
+                        with rasterio.open(patch_file) as patch:
+                            patch_data = patch.read()
+                            bounds = patch.bounds
+
+                        mpc_tensor = torch.from_numpy(patch_data.astype('float32')) # create input tensor of float32 values
+
+                        # Code for normalisation of patch - credit dfc_dataset.py
+                        s2_maxs = []
+                        for b_idx in range(mpc_tensor.shape[0]):
+                            s2_maxs.append(
+                                torch.ones((mpc_tensor.shape[-2], mpc_tensor.shape[-1])) * mpc_tensor[b_idx].max().item() + 1e-5
+                            )
+                        s2_maxs = torch.stack(s2_maxs)
+
+                        mpc_tensor = mpc_tensor / s2_maxs
+
+                        mpc_tensor = torch.unsqueeze(mpc_tensor, 0) # add dimension at first position
+
+                        print(mpc_tensor)
+                        print(mpc_tensor.shape) # output is now [1, 13, 224, 224] as desired
+                        
+                        # control logic 
+                        for patch_name in self.patch_names:
+                            if self.is_stopped:
+                                print("Stop flag detected. Select the patches to start the segmentation again")
+                                self.resetProgressSignal.emit()
+                                return
+
+                            if self.is_paused:
+                                print("Segmentation is paused")
+                                
+                            while self.is_paused:
+                                time.sleep(1)
+
+
+                        if mpc_tensor.shape != [1, 13, 224, 224]:
+                            x_l = 224 - mpc_tensor.size(dim=2) # amount needing to be added to x
+                            y_l = 224 - mpc_tensor.size(dim=3) # amount needing to be added to y
+                        
+                            a = True
+                            try: 
+                                mpc_tensor[0, 1, 0, 223]
+                            except:
+                                a = False
+                            
+                            b = True
+                            try: 
+                                mpc_tensor[0, 1, 223, 223]
+                            except:
+                                b = False
+                            
+                            c = True
+                            try: 
+                                mpc_tensor[0, 1, 0, 0]
+                            except:
+                                c = False
+                            
+                            d = True
+                            try: 
+                                mpc_tensor[0, 1, 223, 0]
+                            except:
+                                d = False
+                            
+                            if a and b: # if (1, 224) and (224, 224) exist [bottom edge]
+                                mpc_tensor = F.pad(mpc_tensor, (y_l, 0, 0, 0, 0, 0, 0, 0), "constant", 0) # prepend difference to y
+                            elif c and d: # if (1, 1) and (224, 1) exist [top edge]
+                                mpc_tensor = F.pad(mpc_tensor, (0, y_l, 0, 0, 0, 0, 0, 0), "constant", 0) # append difference to y
+                            elif b and d: # if (224, 224) and (224, 1) exist [right edge]
+                                mpc_tensor = F.pad(mpc_tensor, (0, 0, x_l, 0, 0, 0, 0, 0), "constant", 0) # prepend difference to x
+                            elif c and a: # if (1, 1) and (1, 224) exist [left edge]
+                                mpc_tensor = F.pad(mpc_tensor, (0, 0, 0, x_l, 0, 0, 0, 0), "constant", 0) # append difference to x
+                            else:
+                                if a: # if (1, 224) exists
+                                    mpc_tensor = F.pad(mpc_tensor, (y_l, 0, 0, x_l, 0, 0, 0, 0), "constant", 0) # append difference to x, prepend differece to y | note values in sequence are flipped
+                                elif b: # if (224, 224) exists
+                                    mpc_tensor = F.pad(mpc_tensor, (y_l, 0, x_l, 0, 0, 0, 0, 0), "constant", 0) # prepend difference to x, prepend difference to y
+                                elif d: # check (224, 1) exists
+                                    mpc_tensor = F.pad(mpc_tensor, (0, y_l, x_l, 0, 0, 0, 0, 0), "constant", 0) # prepend difference to x, append difference to y
+                                elif c: # check (1, 1) exists
+                                    mpc_tensor = F.pad(mpc_tensor, (0, y_l, 0, x_l, 0, 0, 0, 0), "constant", 0) # append difference to x, append difference to y
+                            print(mpc_tensor)
+                            print(mpc_tensor.shape)
+                        patch_img = {"s2": mpc_tensor} # create dictionary using same format as DFC
+
+                        # evaluate using model
+                        model.eval() # sets the model in evaluation mode
+                        output = model(patch_img) # pass input to model, 'output' is instance of DoubleSwinTransformerSegmentation
+                        #output = model(img)
+                        
+
+                        test = torch.max(output, dim=1)
+                        #print(test.indices)
+
+                        output_arrays = test.indices.squeeze()
+                        all_output_arrays.append(output_arrays.cpu().numpy())
+
+                        
+
+                        
+                        # CSV OUTPUT
+
+                        # Get the spatial information from the GeoTIFF file
+                        with rasterio.open(patch_file) as current_patch:
+                            metadata = current_patch.meta
+                            transform = current_patch.transform
+
+                        # Create the "output" folder if it doesn't exist
+                        output_folder = "output"
+                        os.makedirs(output_folder, exist_ok=True)
+
+                        # Get the filename of the current TIF patch
+                        tif_filename = patch_name
+
+                        # Remove the file extension to use as data_info
+                        data_info = os.path.splitext(tif_filename)[0]
+
+                        # Generate the dynamic CSV filename
+                        csv_filename = os.path.join(output_folder, f"output_data_{data_info}.csv")
+
+                        # Create a CSV file inside the "output" folder for writing
+                        with open(csv_filename, mode='w', newline='') as csv_file:
+                            csv_writer = csv.writer(csv_file)
+                        
+                            # Write a header row with column names
+                            csv_writer.writerow(["Latitude", "Longitude", "Class"])
+                        
+                            # Loop through the rows of output_arrays
+                            for row_index, row in enumerate(output_arrays):
+                                for col_index, class_value in enumerate(row):
+                                    # Calculate the geographic coordinates for each pixel
+                                    pixel_coordinates = transform * (col_index, row_index)
+                                
+                                    # Convert tensor element to a Python scalar
+                                    class_value_scalar = class_value.item()
+                                
+                                    # Write the coordinates and class value to the CSV file
+                                    csv_writer.writerow([pixel_coordinates[0], pixel_coordinates[1], class_value_scalar])
+                        
+                                
+                        # Print a message indicating the CSV file was created
+                        print(f"CSV file '{csv_filename}' created.")
+
+                        # ADD BAND TO GEOTIFF WITH SEGMENTATION CLASSES
+
+                        # Create a new GeoTIFF file with an additional band for segmentation classes 
+                        # We can setup to overwrite the old patch here or delete the old patch after to save space
+                        output_tif_filename = os.path.join(output_folder, f"output_patch_{patch_name}")
+
+                        # Create a copy of the input patch as a starting point for the output patch
+                        with rasterio.open(patch_file) as input_patch:
+                            output_meta = input_patch.meta
+                            output_meta['count'] += 1  # Increment the number of bands for the new class band
+
+                            with rasterio.open(output_tif_filename, 'w', **output_meta) as output_patch:
+                                # Copy the existing bands to the new GeoTIFF
+                                for i in range(1, input_patch.count + 1):
+                                    output_patch.write(input_patch.read(i), i)
+
+                                # Add the segmentation classes as an additional band (band number is input_patch.count + 1)
+                                output_patch.write(output_arrays, input_patch.count + 1)
+
+                        print(f"GeoTIFF file '{output_tif_filename}' created.")
+
+                        npy_output_folder = "npy_outputs"
+                        os.makedirs(npy_output_folder, exist_ok=True)  
+                        combined_npy_filename = os.path.join(npy_output_folder, "all_output_arrays.npy")
+                        np.save(combined_npy_filename, all_output_arrays)
+
+
+                        print(f"All arrays saved to '{combined_npy_filename}'.")        
+
+                # VISUALISATION CODE
+                # val_dataset.test_visual_mpc(mpc_tensor, output_arrays)
+   
+                self.finishedSignal.emit("Segmentation Finished!")
+
+        except Exception as e:
+            self.errorSignal.emit(str(e))
+
+    def pause(self):
+        print("Setting pause flag.")
+        self.is_paused = True
+
+    def resume(self):
+        print("Clearing pause flag.")
+        self.is_paused = False
+
+    def stop(self):
+        print("Setting stop flag.")
+        self.is_paused = False
+        self.is_stopped = True
         
-        file_btn = QPushButton("Select Patches")
-        file_btn.setStyleSheet("background-color: transparent; color: white; font-size: 14px;")
-        file_btn.clicked.connect(self.open_map_dialog)
-        col1_layout.addWidget(file_btn, alignment=Qt.AlignCenter)
-        
-        col1_layout.setSpacing(20)
-        col1_frame = QFrame()
-        col1_frame.setLayout(col1_layout)
-        col1_frame.setAutoFillBackground(True)
-        palette = col1_frame.palette()
-        palette.setColor(QPalette.Window, QColor("darkgreen"))
-        col1_frame.setPalette(palette)
-        self.main_layout.addWidget(col1_frame)
-
-        # Column 2
-        col2_layout = QVBoxLayout()
-
-         # Square 1
-        square1_layout = QVBoxLayout()
-        # square1_layout.setAlignment(Qt.AlignCenter)  
-        self.list_widget = QListWidget(self)
-        self.list_widget.setSelectionMode(QListWidget.MultiSelection)  
-        square1_layout.addWidget(self.list_widget)
-
-        select_all_button = QPushButton('Select All', self)
-        select_all_button.clicked.connect(self.select_all_patches)
-        square1_layout.addWidget(select_all_button)
-
-        segment_btn = QPushButton('Start Segmentation', self)
-        segment_btn.clicked.connect(self.segment_patches)
-        square1_layout.addWidget(segment_btn, alignment=Qt.AlignCenter)
-
-        # Control buttons 
-        control_layout = QHBoxLayout()
-        btn_style = "font-size: 10px; width: 10px; height: 10px;"  
-        stop_btn = QPushButton("■")
-        stop_btn.setStyleSheet(btn_style)
-        stop_btn.clicked.connect(self.stop_segmentation)
-
-        pause_btn = QPushButton("❙❙")
-        pause_btn.setStyleSheet(btn_style)
-        pause_btn.clicked.connect(self.pause_segmentation)
-
-        play_btn = QPushButton("▶")
-        play_btn.setStyleSheet(btn_style)
-        play_btn.clicked.connect(self.start_segmentation)
-        
-        control_layout.addWidget(stop_btn)
-        control_layout.addWidget(pause_btn)
-        control_layout.addWidget(play_btn)
-
-        square1_layout.addLayout(control_layout)
-
-        square1 = RoundedSquare("white")
-        square1.setLayout(square1_layout)
-        square1.setFixedSize(324, 400)
-        col2_layout.addWidget(square1)
-
-        col2_frame = QFrame()
-        col2_frame.setLayout(col2_layout)
-        self.main_layout.addWidget(col2_frame)
-        
-        # process bar
-        self.progress_bar = QProgressBar(self)
-        self.progress_bar.setRange(0, 100)
-
-        self.progress_details_label = QLabel(self)
-
-        col2_layout.addWidget(self.progress_bar)
-        col2_layout.addWidget(self.progress_details_label)
-        
-
-        # main_layout.setStretch(0, 2)
-        # main_layout.setStretch(1, 8)
-
-        central_widget = QWidget()
-        central_widget.setLayout(self.main_layout)
-        self.setCentralWidget(central_widget)
-
-
-    def display_patches(self):
-        print("Display patches function called")  
-        patch_names = [file for file in os.listdir(self.patch_folder) if file.endswith('.tif')]
-        self.list_widget.addItems(patch_names)
-    
-    def select_all_patches(self):
-        self.list_widget.selectAll()
-
-    def segment_patches(self):
-        print("Segmentation function called")  
-        selected_items = self.list_widget.selectedItems()
-        if not selected_items:
-            print("No patch selected!")
-            return
-
-        self.selected_patch_names = [item.text() for item in selected_items]
-        self.segmentation_thread = SegmentationThread(self.selected_patch_names)
-        self.segmentation_thread.progressSignal.connect(self.update_progress)
-        self.segmentation_thread.finishedSignal.connect(self.on_segmentation_finished)
-        self.segmentation_thread.errorSignal.connect(self.on_segmentation_error)
-        self.segmentation_thread.start()
-
-    def update_progress(self, value):
-        print(f"Number of patches selected: {self.selected_patch_names}")
-        if not hasattr(self, 'selected_patch_names'):
-            return
-        self.progress_bar.setValue(value)
-        completed_patches = int(value / 100 * len(self.selected_patch_names))
-        self.progress_details_label.setText(f"{completed_patches}/{len(self.selected_patch_names)} patches processed")
-        self.segmentation_thread.resetProgressSignal.connect(self.reset_progress_bar)
-
-    def reset_progress_bar(self):
-        self.progress_bar.setValue(0)
-        self.progress_details_label.setText(f"0/{len(self.selected_patch_names)} patches")
-    
-    def display_pie_chart(self):
-        output_arrays = np.load('npy_outputs/all_output_arrays.npy')
-        unique_elements, counts_elements = np.unique(output_arrays, return_counts=True)
-        total_count = np.sum(counts_elements)
-        class_mapping = {
-            0: "Forest",
-            1: "Shrubland",
-            2: "Grassland",
-            3: "Wetlands",
-            4: "Croplands",
-            5: "Urban/Built-up",
-            6: "Barren",
-            7: "Water",
-            255: "Invalid",
-        }
-        data = {class_mapping[label]: (count / total_count) * 100 for label, count in zip(unique_elements, counts_elements) if label in class_mapping}
-
-        # Initialize the PieChartDemo
-        if hasattr(self, 'pie_chart_gui'):
-            self.pie_chart_gui.setParent(None)  
-            self.pie_chart_gui.deleteLater() 
-        
-        self.pie_chart_gui = PieChartDemo(data)
-        # self.pie_chart_gui.setFixedSize(350, 400)
-        self.pie_chart_gui.setStyleSheet("border: none;")
-
-        self.main_layout.addWidget(self.pie_chart_gui)
-
-        self.update()
-        self.resize(1200, 500)
-
-    # Slot to handle the signal when segmentation finishes
-    def on_segmentation_finished(self):
-        print("segmentation is running successfully")
-        self.display_pie_chart()
-
-    # Slot to handle the signal on segmentation error
-    def on_segmentation_error(self, error_message):
-        print(f"Error: {error_message}")
-
-    
-
-    def start_segmentation(self):
-    
-        if not hasattr(self, 'segmentation_thread') or not self.segmentation_thread.isRunning():
-            print("Starting a new thread")
-            self.segmentation_thread = SegmentationThread(self.selected_patch_names)
-            self.segmentation_thread.start()
-        else:
-            print("Resuming thread")
-            self.segmentation_thread.resume()
-
-    def pause_segmentation(self):
-        if hasattr(self, 'segmentation_thread'):
-            print("pause button")
-            self.segmentation_thread.pause()
-
-    def stop_segmentation(self):
-        if hasattr(self, 'segmentation_thread'):
-            print("stop button pressed")
-            self.segmentation_thread.stop()
-
-        # self.progress_bar.setValue(0)
-        # self.progress_details_label.setText(f"0/{len(self.selected_patch_names)} patches")
-
-    def open_map_dialog(self):
-        self.map_window = QMainWindow(self)
-        self.map_window.setWindowTitle("Select Location on Map")
-        self.map_window.setGeometry(100, 100, 800, 600)
-        
-        browser = QWebEngineView(self.map_window)
-        
-        channel = QWebChannel(browser.page())
-        browser.page().setWebChannel(channel)
-
-        self.map_handler = MapHandler()
-        channel.registerObject('mapHandler', self.map_handler)
-
-        # Load HTML with Leaflet and Leaflet.draw 
-        browser.setHtml("""
-            <html>
-                <head>
-                    <title>Interactive Map</title>
-                    <meta charset="utf-8" />
-                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
-                    <link rel="stylesheet" href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css" />
-                    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
-                    <script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
-                    <script src="qrc:///qtwebchannel/qwebchannel.js"></script>
-                </head>
-                <body>
-                    <div id="map" style="width: 800px; height: 600px;"></div>
-                    <script>
-                        var map = L.map('map').setView([-37.8136, 144.9631], 10);
-                        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-
-                        var drawnItems = new L.FeatureGroup();
-                        map.addLayer(drawnItems);
-
-                        var drawControl = new L.Control.Draw({
-                            draw: {
-                                polyline: false,
-                                polygon: false,
-                                circle: false,
-                                marker: false,
-                                circlemarker: false
-                            },
-                            edit: {
-                                featureGroup: drawnItems
-                            }
-                        });
-                        map.addControl(drawControl);
-
-                        map.on(L.Draw.Event.CREATED, function (e) {
-                            var type = e.layerType;
-                            var layer = e.layer;
-
-                            if (type === 'rectangle') {
-                                var coords = {
-                                    northEast: layer.getBounds().getNorthEast(),
-                                    southWest: layer.getBounds().getSouthWest()
-                                };
-
-                                new QWebChannel(qt.webChannelTransport, function(channel) {
-                                    var mapHandler = channel.objects.mapHandler;
-                                    mapHandler.receiveMapSelection(coords);
-                                });
-                            }
-
-                            drawnItems.addLayer(layer);
-                        });
-                    </script>
-                </body>
-            </html>
-        """)
-        
-        self.map_window.setCentralWidget(browser)
-        self.map_window.show()
-
-class MapHandler(QObject):
-    @pyqtSlot('QVariant')
-    def receiveMapSelection(self, coords):
-        print(f"Selected area NorthEast: {coords['northEast']}, SouthWest: {coords['southWest']}")
-
-if __name__ == "__main__":
-    app = QApplication(sys.argv)
-    window = DesktopUI()
-    window.show()
-    sys.exit(app.exec_())
