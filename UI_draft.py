@@ -168,7 +168,12 @@ class DesktopUI(QMainWindow):
         self.progress_bar.setValue(value)
         completed_patches = int(value / 100 * len(self.selected_patch_names))
         self.progress_details_label.setText(f"{completed_patches}/{len(self.selected_patch_names)} patches processed")
+        self.segmentation_thread.resetProgressSignal.connect(self.reset_progress_bar)
 
+    def reset_progress_bar(self):
+        self.progress_bar.setValue(0)
+        self.progress_details_label.setText(f"0/{len(self.selected_patch_names)} patches")
+    
     def display_pie_chart(self):
         output_arrays = np.load('npy_outputs/all_output_arrays.npy')
         unique_elements, counts_elements = np.unique(output_arrays, return_counts=True)
@@ -230,6 +235,9 @@ class DesktopUI(QMainWindow):
         if hasattr(self, 'segmentation_thread'):
             print("stop button pressed")
             self.segmentation_thread.stop()
+
+        # self.progress_bar.setValue(0)
+        # self.progress_details_label.setText(f"0/{len(self.selected_patch_names)} patches")
 
     def open_map_dialog(self):
         self.map_window = QMainWindow(self)
