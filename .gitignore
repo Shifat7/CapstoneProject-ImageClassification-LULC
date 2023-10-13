@@ -1,7 +1,7 @@
 checkpoints/*
 splits/*
+!splits/test_observations.csv
 wandb/*
-splits
 checkpoints
 wandb
 Patch_Cropper/patches/*
@@ -16,3 +16,5 @@ output_tif/*
 *.pyc
 __pycache__/
 __pycache__
+npy_outputs/*
+npy_outputs
