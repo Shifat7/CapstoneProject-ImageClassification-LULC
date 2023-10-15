@@ -92,6 +92,7 @@ class SegmentationThread(QThread):
 
                 all_output_arrays = []
                 for index, patch_name in enumerate(self.patch_names):
+                        print("Patch name: " + patch_name)
 
                         progress_percentage = int((index + 1) / len(self.patch_names) * 100)
                         self.progressSignal.emit(progress_percentage)
@@ -121,18 +122,16 @@ class SegmentationThread(QThread):
                         print(mpc_tensor.shape) # output is now [1, 13, 224, 224] as desired
                         
                         # control logic 
-                        for patch_name in self.patch_names:
-                            if self.is_stopped:
-                                print("Stop flag detected. Select the patches to start the segmentation again")
-                                self.resetProgressSignal.emit()
-                                return
+                        if self.is_stopped:
+                            print("Stop flag detected. Select the patches to start the segmentation again")
+                            self.resetProgressSignal.emit()
+                            return
 
-                            if self.is_paused:
-                                print("Segmentation is paused")
+                        if self.is_paused:
+                            print("Segmentation is paused")
                                 
-                            while self.is_paused:
-                                time.sleep(1)
-
+                        while self.is_paused:
+                            time.sleep(1)
 
                         if mpc_tensor.shape != [1, 13, 224, 224]:
                             x_l = 224 - mpc_tensor.size(dim=2) # amount needing to be added to x
@@ -179,8 +178,6 @@ class SegmentationThread(QThread):
                                     mpc_tensor = F.pad(mpc_tensor, (0, y_l, x_l, 0, 0, 0, 0, 0), "constant", 0) # prepend difference to x, append difference to y
                                 elif c: # check (1, 1) exists
                                     mpc_tensor = F.pad(mpc_tensor, (0, y_l, 0, x_l, 0, 0, 0, 0), "constant", 0) # append difference to x, append difference to y
-                            print(mpc_tensor)
-                            print(mpc_tensor.shape)
                         patch_img = {"s2": mpc_tensor} # create dictionary using same format as DFC
 
                         # evaluate using model
@@ -210,6 +207,7 @@ class SegmentationThread(QThread):
                         os.makedirs(output_folder, exist_ok=True)
 
                         # Get the filename of the current TIF patch
+                        print("Patch name: " + patch_name)
                         tif_filename = patch_name
 
                         # Remove the file extension to use as data_info
