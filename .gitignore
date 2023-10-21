@@ -13,3 +13,4 @@ Data_Downloader/DataFolder
 output/*
 output_tif/*
 *.pyc
+lulc/*
