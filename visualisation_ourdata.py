@@ -26,13 +26,17 @@ class SegmentationThread(QThread):
     finishedSignal = pyqtSignal(str)
     progressSignal = pyqtSignal(int)
     resetProgressSignal = pyqtSignal()
+    updatePieChartSignal = pyqtSignal(object)
 
-    def __init__(self, patch_names):
+    def __init__(self, model_file_path, patch_names):
         super(SegmentationThread, self).__init__()
+        print("Patch Names:", patch_names)
+        print("Model File Path:", model_file_path)
+        self.model_file_path = model_file_path or "swin-t-pixel-classification-final-epoch-200.pth"
         self.patch_names = patch_names
         self.is_stopped = False
         self.is_paused = False
-
+        
     def run(self):
         try:
 
@@ -81,7 +85,11 @@ class SegmentationThread(QThread):
                 model = DoubleSwinTransformerSegmentationS2(s2_backbone, out_dim=data_config['num_classes'], device=device)
 
                     # load desired segmentation checkpoint (pick in GUI)
-                model.load_state_dict(torch.load("swin-t-pixel-classification-final-epoch-200.pth", map_location='cpu')) # replace path with desired checkpoint
+                
+                # model.load_state_dict(torch.load("swin-t-pixel-classification-final-epoch-200.pth", map_location='cpu')) # replace path with desired checkpoint
+                
+                # print(type(self.model_file_path), self.model_file_path)
+                model.load_state_dict(torch.load(self.model_file_path, map_location='cpu'))
                 model.to(device)
 
                     # array of patch names (feed in from input.csv file or pick in GUI)
@@ -122,16 +130,18 @@ class SegmentationThread(QThread):
                         print(mpc_tensor.shape) # output is now [1, 13, 224, 224] as desired
                         
                         # control logic 
+                        
                         if self.is_stopped:
-                            print("Stop flag detected. Select the patches to start the segmentation again")
-                            self.resetProgressSignal.emit()
-                            return
+                                print("Stop flag detected. Select the patches to start the segmentation again")
+                                self.resetProgressSignal.emit()
+                                return
 
                         if self.is_paused:
-                            print("Segmentation is paused")
+                                print("Segmentation is paused")
                                 
                         while self.is_paused:
-                            time.sleep(1)
+                                time.sleep(1)
+
 
                         if mpc_tensor.shape != [1, 13, 224, 224]:
                             x_l = 224 - mpc_tensor.size(dim=2) # amount needing to be added to x
@@ -178,6 +188,8 @@ class SegmentationThread(QThread):
                                     mpc_tensor = F.pad(mpc_tensor, (0, y_l, x_l, 0, 0, 0, 0, 0), "constant", 0) # prepend difference to x, append difference to y
                                 elif c: # check (1, 1) exists
                                     mpc_tensor = F.pad(mpc_tensor, (0, y_l, 0, x_l, 0, 0, 0, 0), "constant", 0) # append difference to x, append difference to y
+                            # print(mpc_tensor)
+                            # print(mpc_tensor.shape)
                         patch_img = {"s2": mpc_tensor} # create dictionary using same format as DFC
 
                         # evaluate using model
@@ -261,7 +273,8 @@ class SegmentationThread(QThread):
                         print(f"GeoTIFF file '{output_tif_filename}' created.")
 
                         npy_output_folder = "npy_outputs"
-                        os.makedirs(npy_output_folder, exist_ok=True)  
+                        os.makedirs(npy_output_folder, exist_ok=True)
+                        self.updatePieChartSignal.emit(all_output_arrays)  
                         combined_npy_filename = os.path.join(npy_output_folder, "all_output_arrays.npy")
                         np.save(combined_npy_filename, all_output_arrays)
 
