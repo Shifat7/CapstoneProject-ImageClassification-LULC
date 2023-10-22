@@ -20,7 +20,7 @@ class DesktopUI(QMainWindow):
         self.patch_folder = 'Patch_Cropper/patches_test'
         self.selected_patch_names = []
         self.selected_model_path = []
-
+        self.matching_files = []
         self.init_ui()
 
     def init_ui(self):
@@ -62,7 +62,7 @@ class DesktopUI(QMainWindow):
         
         list_patches_btn = QPushButton("List Current Patches")
         list_patches_btn.setStyleSheet("background-color: transparent; color: white; font-size: 14px;")
-        list_patches_btn.clicked.connect(self.display_patches)
+        list_patches_btn.clicked.connect(self.display_patches_list)
         col1_layout.addWidget(list_patches_btn, alignment=Qt.AlignCenter)
         col1_layout.addSpacing(25)
         
@@ -78,7 +78,7 @@ class DesktopUI(QMainWindow):
         col1_frame.setLayout(col1_layout)
         col1_frame.setAutoFillBackground(True)
 
-        image_path = "background.png"  
+        image_path = "image.png"  
         stylesheet = f"""
             QFrame {{
                 border-radius: 10px;
@@ -110,6 +110,7 @@ class DesktopUI(QMainWindow):
 
         
         self.list_widget = QListWidget(self)
+        self.list_widget.addItems(self.matching_files)
         self.list_widget.setSelectionMode(QListWidget.MultiSelection)
         square1_layout.addWidget(self.list_widget)
 
@@ -152,7 +153,7 @@ class DesktopUI(QMainWindow):
             }
 
             QProgressBar::chunk {
-                background-color: #E63946;
+                background-color: #8EB89E;
                 width: 10px;
             }
         """)
@@ -178,7 +179,7 @@ class DesktopUI(QMainWindow):
         self.setCentralWidget(central_widget)
 
 
-    def display_patches(self):
+    def display_patches_list(self):
         print("Display patches function called")  
         self.list_widget.clear()
         # self.list_widget = QListWidget(self)
@@ -273,15 +274,16 @@ class DesktopUI(QMainWindow):
         
         data = {class_mapping[label]: (count / total_count) * 100 for label, count in zip(unique_elements, counts_elements) if label in class_mapping}
         
-        # If pie_chart_gui already exists, update its data. Otherwise, create a new one.
-        if hasattr(self, 'pie_chart_gui'):
+        if hasattr(self, 'pie_chart_gui') and self.pie_chart_gui is not None:
             self.pie_chart_gui.update_data(data) 
         else:
             self.pie_chart_gui = PieChartDemo(data)
             self.main_layout.addWidget(self.pie_chart_gui)
+            return
 
         self.update()
         self.resize(1200, 500)
+
     
     def display_pie_chart(self):
         output_arrays = np.load('npy_outputs/all_output_arrays.npy')
@@ -302,14 +304,10 @@ class DesktopUI(QMainWindow):
 
         # Initialize the PieChartDemo
         if hasattr(self, 'pie_chart_gui'):
-            self.pie_chart_gui.setParent(None)  
-            self.pie_chart_gui.deleteLater() 
-        
-        self.pie_chart_gui = PieChartDemo(data)
-        # self.pie_chart_gui.setFixedSize(350, 400)
-        self.pie_chart_gui.setStyleSheet("border: none;")
-
-        self.main_layout.addWidget(self.pie_chart_gui)
+            self.pie_chart_gui.update_data(data) 
+        else:
+            self.pie_chart_gui = PieChartDemo(data)
+            self.main_layout.addWidget(self.pie_chart_gui)
 
         self.update()
         self.resize(1200, 500)
@@ -324,7 +322,12 @@ class DesktopUI(QMainWindow):
     def on_segmentation_error(self, error_message):
         print(f"Error: {error_message}")
 
-    
+    # def remove_pie_chart(self):
+    #     if hasattr(self, 'pie_chart_gui'):
+    #         self.pie_chart_gui.setParent(None)
+    #         self.pie_chart_gui.deleteLater()
+    #         self.pie_chart_gui = None
+
 
     def start_segmentation(self):
         if hasattr(self, 'segmentation_thread') and self.segmentation_thread.isRunning():
@@ -340,6 +343,8 @@ class DesktopUI(QMainWindow):
         if hasattr(self, 'segmentation_thread'):
             print("stop button pressed")
             self.segmentation_thread.stop()
+            # self.pie_chart_gui.setParent(None)
+            # self.pie_chart_gui.deleteLater()
 
        
 
@@ -347,6 +352,7 @@ class DesktopUI(QMainWindow):
         self.map_window = QMainWindow(self)
         self.map_window.setWindowTitle("Select Location on Map")
         self.map_window.setGeometry(100, 100, 800, 600)
+
         
         browser = QWebEngineView(self.map_window)
         
