@@ -1,0 +1,1 @@
+Add input files here. Must be 224 x 224px or smaller, 13 band GeoTIFF (or output 14 band) files.

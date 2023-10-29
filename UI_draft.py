@@ -17,7 +17,7 @@ class DesktopUI(QMainWindow):
     def __init__(self):
         print("list object created")  
         super().__init__()
-        self.patch_folder = 'Patch_Cropper/patches_test'
+        self.patch_folder = 'input'
         self.selected_patch_names = []
         self.selected_model_path = []
         self.matching_files = []

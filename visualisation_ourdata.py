@@ -95,7 +95,7 @@ class SegmentationThread(QThread):
                     # array of patch names (feed in from input.csv file or pick in GUI)
                     #patch_names = ['S2A_MSIL2A_20220108T002711_R016_T54HWF_20220110T213759_combined_01_01', 'S2A_MSIL2A_20220108T002711_R016_T54HWF_20220110T213759_combined_01_02']
 
-                input_folder = os.path.join('Patch_Cropper', 'patches_test') # set input folder for complete data set (i.e., entire state)
+                input_folder = os.path.join('input') # set input folder for complete data set (i.e., entire state)
                     # patch_names = [file for file in os.listdir(input_folder) if file.endswith('.tif')] # all patches under input directory
 
                 all_output_arrays = []
